@@ -14,15 +14,49 @@ export default function StudentPage() {
   const [showPassword, setShowPassword] = useState(true);
 
   const handleChange = (field) => (event) => {
-    setForm((prev) => ({ ...prev, [field]: event.target.value }));
+    const rawValue = event.target.value;
+    let nextValue = rawValue;
+
+    if (field === 'name') {
+      nextValue = rawValue.replace(/[^A-Za-z\s]/g, '');
+    }
+    if (field === 'phone') {
+      nextValue = rawValue.replace(/\D/g, '').slice(0, 10);
+    }
+    if (field === 'sessionId') {
+      nextValue = rawValue.trimStart();
+    }
+
+    setForm((prev) => ({ ...prev, [field]: nextValue }));
   };
 
+  const normalizedName = form.name.trim();
+  const normalizedPhone = form.phone.trim();
+  const normalizedSessionId = form.sessionId.trim();
+  const normalizedPassword = form.password;
+  const isValidName = /^[A-Za-z\s]+$/.test(normalizedName) && normalizedName.length >= 2;
+  const isValidPhone = /^\d{10}$/.test(normalizedPhone);
+
   const handleSessionLookup = async () => {
+    if (!isValidName) {
+      setMessage('Name must contain only letters and spaces.');
+      return;
+    }
+    if (!isValidPhone) {
+      setMessage('Phone number must be exactly 10 digits.');
+      return;
+    }
+    if (!normalizedSessionId) {
+      setMessage('Enter a valid session ID.');
+      return;
+    }
+
     setLoading(true);
     setMessage('');
     try {
-      const response = await api.get(`/api/students/session/${form.sessionId}`);
+      const response = await api.get(`/api/students/session/${encodeURIComponent(normalizedSessionId)}`);
       setSessionMeta(response.data.session);
+      setForm((prev) => ({ ...prev, sessionId: normalizedSessionId }));
       setStep(2);
     } catch (err) {
       setMessage(err.response?.data?.error || 'Session lookup failed');
@@ -36,18 +70,18 @@ export default function StudentPage() {
     setMessage('');
     try {
       await api.post('/api/students/verify-password', {
-        sessionId: form.sessionId,
-        password: form.password
+        sessionId: normalizedSessionId,
+        password: normalizedPassword
       });
       const joinResponse = await api.post('/api/students/join', {
-        name: form.name,
-        phone: form.phone,
-        sessionId: form.sessionId
+        name: normalizedName,
+        phone: normalizedPhone,
+        sessionId: normalizedSessionId
       });
       localStorage.setItem('studentId', joinResponse.data.studentId);
-      localStorage.setItem('studentSessionId', form.sessionId);
-      localStorage.setItem('studentName', form.name);
-      localStorage.setItem('studentSessionMeta', JSON.stringify(sessionMeta || {}));
+      localStorage.setItem('studentSessionId', sessionMeta?.sessionId || normalizedSessionId);
+      localStorage.setItem('studentName', normalizedName);
+      localStorage.setItem('studentSessionMeta', JSON.stringify(sessionMeta || { sessionId: normalizedSessionId }));
       router.push('/student/instructions');
     } catch (err) {
       setMessage(err.response?.data?.error || 'Unable to verify session password');
@@ -91,18 +125,18 @@ export default function StudentPage() {
               <div className="mt-6 space-y-4">
                 <div>
                   <label className="label">Name</label>
-                  <input className="input" value={form.name} onChange={handleChange('name')} />
+                  <input className="input" value={form.name} onChange={handleChange('name')} placeholder="Letters only" />
                 </div>
                 <div>
                   <label className="label">Phone Number</label>
-                  <input className="input" value={form.phone} onChange={handleChange('phone')} />
+                  <input className="input" value={form.phone} onChange={handleChange('phone')} inputMode="numeric" maxLength={10} placeholder="10 digit mobile number" />
                 </div>
                 <div>
                   <label className="label">Session ID</label>
                   <input className="input" value={form.sessionId} onChange={handleChange('sessionId')} />
                 </div>
                 {message && <p className="text-sm text-red-600">{message}</p>}
-                <button className="btn-primary w-full" onClick={handleSessionLookup} disabled={loading || !form.name || !form.phone || !form.sessionId}>
+                <button className="btn-primary w-full" onClick={handleSessionLookup} disabled={loading || !normalizedName || !normalizedPhone || !normalizedSessionId || !isValidName || !isValidPhone}>
                   {loading ? 'Checking session...' : 'Continue'}
                 </button>
               </div>
@@ -127,7 +161,7 @@ export default function StudentPage() {
                 {message && <p className="text-sm text-red-600">{message}</p>}
                 <div className="flex gap-3">
                   <button className="btn-outline" onClick={() => setStep(1)}>Back</button>
-                  <button className="btn-accent flex-1" onClick={handleVerifyAndJoin} disabled={loading || !form.password}>
+                  <button className="btn-accent flex-1" onClick={handleVerifyAndJoin} disabled={loading || !normalizedPassword}>
                     {loading ? 'Verifying...' : 'Enter Instructions'}
                   </button>
                 </div>
