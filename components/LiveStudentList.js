@@ -1,5 +1,13 @@
 'use client';
 
+function formatViolationSummary(summary = {}) {
+  const entries = Object.entries(summary);
+  if (!entries.length) {
+    return 'None';
+  }
+  return entries.map(([type, count]) => `${type} (${count})`).join(', ');
+}
+
 export default function LiveStudentList({ data }) {
   const entries = Object.entries(data || {});
   if (!entries.length) {
@@ -46,6 +54,13 @@ export default function LiveStudentList({ data }) {
               <p className="text-xs uppercase tracking-[0.2em] text-slate-400">Accuracy</p>
               <p className="mt-2 text-lg font-semibold text-slate-900">{student.accuracy ?? 0}%</p>
             </div>
+          </div>
+          <div className="mt-3 rounded-[22px] border border-[rgba(17,33,61,0.08)] bg-slate-50 px-4 py-3 text-sm text-slate-600">
+            <p className="text-xs uppercase tracking-[0.2em] text-slate-400">Violation Types</p>
+            <p className="mt-2">{formatViolationSummary(student.violationSummary)}</p>
+            {student.attemptedFullscreenExit && (
+              <p className="mt-2 font-semibold text-orange-700">Attempted fullscreen exit detected</p>
+            )}
           </div>
         </div>
       ))}

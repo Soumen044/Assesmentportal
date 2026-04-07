@@ -24,11 +24,15 @@ export default function ExamPage() {
   const [timeLeft, setTimeLeft] = useState(null);
   const [message, setMessage] = useState('');
   const [violationCount, setViolationCount] = useState(0);
+  const [fullscreenModalOpen, setFullscreenModalOpen] = useState(false);
+  const [fullscreenCountdown, setFullscreenCountdown] = useState(8);
   const submittingRef = useRef(false);
   const timerReadyRef = useRef(false);
   const safeExitRef = useRef(false);
   const touchTrackerRef = useRef({ lastTapAt: 0 });
   const warningTimerRef = useRef(null);
+  const fullscreenModalTimerRef = useRef(null);
+  const fullscreenViolationLoggedRef = useRef(false);
 
   const pushWarning = (warning) => {
     if (warningTimerRef.current) {
@@ -53,6 +57,9 @@ export default function ExamPage() {
     return () => {
       if (warningTimerRef.current) {
         window.clearTimeout(warningTimerRef.current);
+      }
+      if (fullscreenModalTimerRef.current) {
+        window.clearInterval(fullscreenModalTimerRef.current);
       }
     };
   }, []);
@@ -118,6 +125,35 @@ export default function ExamPage() {
     }
   }, [timeLeft, questions.length]);
 
+  useEffect(() => {
+    if (!fullscreenModalOpen) {
+      if (fullscreenModalTimerRef.current) {
+        window.clearInterval(fullscreenModalTimerRef.current);
+      }
+      setFullscreenCountdown(8);
+      return undefined;
+    }
+
+    fullscreenModalTimerRef.current = window.setInterval(() => {
+      setFullscreenCountdown((previous) => {
+        if (previous <= 1) {
+          if (fullscreenModalTimerRef.current) {
+            window.clearInterval(fullscreenModalTimerRef.current);
+          }
+          handleAutoSubmit('fullscreen-exit');
+          return 0;
+        }
+        return previous - 1;
+      });
+    }, 1000);
+
+    return () => {
+      if (fullscreenModalTimerRef.current) {
+        window.clearInterval(fullscreenModalTimerRef.current);
+      }
+    };
+  }, [fullscreenModalOpen]);
+
   const reportViolation = async (type, warning) => {
     const sessionId = localStorage.getItem('studentSessionId');
     const studentId = localStorage.getItem('studentId');
@@ -167,11 +203,11 @@ export default function ExamPage() {
   useEffect(() => {
     const handleVisibility = () => {
       if (document.visibilityState === 'hidden') {
-        reportViolation('visibilitychange', 'Do not change tabs. This has been marked as a violation.');
+        reportViolation('tab-switch', 'Do not change tabs. This has been marked as a violation.');
       }
     };
 
-    const handleBlur = () => reportViolation('blur', 'The browser lost focus. This has been marked as a violation.');
+    const handleBlur = () => reportViolation('browser-blur', 'The browser lost focus. This has been marked as a violation.');
 
     const handleBeforeUnload = (event) => {
       if (safeExitRef.current || submittingRef.current) {
@@ -189,24 +225,31 @@ export default function ExamPage() {
 
     const handleContextMenu = (event) => {
       event.preventDefault();
-      reportViolation('right-click', 'Do not right click. It will be marked as a violation.');
+      reportViolation('right-click-attempt', 'Do not right click. It will be marked as a violation.');
     };
 
     const handleDoubleClick = () => {
-      reportViolation('double-click', 'Do not double click. It will be marked as a violation.');
+      reportViolation('double-click-attempt', 'Do not double click. It will be marked as a violation.');
     };
 
     const handleTouchEnd = () => {
       const now = Date.now();
       if (now - touchTrackerRef.current.lastTapAt < 320) {
-        reportViolation('double-tap', 'Do not double tap. It will be marked as a violation.');
+        reportViolation('double-tap-attempt', 'Do not double tap. It will be marked as a violation.');
       }
       touchTrackerRef.current.lastTapAt = now;
     };
 
     const handleFullscreenExit = () => {
-      if (!document.fullscreenElement) {
-        reportViolation('fullscreen-exit', 'Do not exit fullscreen. It has been marked as a violation.');
+      if (!document.fullscreenElement && !safeExitRef.current && !submittingRef.current) {
+        if (!fullscreenViolationLoggedRef.current) {
+          fullscreenViolationLoggedRef.current = true;
+          reportViolation('fullscreen-exit-attempt', 'Fullscreen exit attempted. Return immediately or the exam will be auto-submitted.');
+        }
+        setFullscreenModalOpen(true);
+      } else if (document.fullscreenElement) {
+        fullscreenViolationLoggedRef.current = false;
+        setFullscreenModalOpen(false);
       }
     };
 
@@ -228,6 +271,16 @@ export default function ExamPage() {
       window.removeEventListener('beforeunload', handleBeforeUnload);
     };
   }, []);
+
+  const requestFullscreenRecovery = async () => {
+    try {
+      if (document.documentElement.requestFullscreen) {
+        await document.documentElement.requestFullscreen();
+      }
+    } catch (err) {
+      pushWarning('Fullscreen could not be restored automatically. Try again immediately.');
+    }
+  };
 
   const saveAnswer = async (answerOverride) => {
     const sessionId = localStorage.getItem('studentSessionId');
@@ -285,6 +338,24 @@ export default function ExamPage() {
     <main className="page-shell surface-grid">
       <div className="page-wrap max-w-5xl">
         <section className="space-y-6 fade-rise">
+          {fullscreenModalOpen && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-[rgba(17,33,61,0.7)] px-4">
+              <div className="card-strong max-w-xl">
+                <div className="badge-orange">Fullscreen Warning</div>
+                <h2 className="section-title mt-4 text-2xl">You exited fullscreen.</h2>
+                <p className="mt-3 text-sm text-slate-600">
+                  This has been marked as a violation. If you do not return to fullscreen within {fullscreenCountdown} seconds,
+                  your exam will be auto-submitted.
+                </p>
+                <div className="mt-6 flex flex-wrap gap-3">
+                  <button className="btn-primary" onClick={requestFullscreenRecovery}>Return to Fullscreen</button>
+                  <button className="btn-accent" onClick={() => handleAutoSubmit('fullscreen-exit-confirmed')}>
+                    Submit Now
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
           <div className="card-strong">
             <div className="flex flex-wrap items-center justify-between gap-4">
               <div>
@@ -293,6 +364,9 @@ export default function ExamPage() {
                 <p className="mt-2 text-sm text-slate-600">
                   Violations recorded: <span className="font-semibold text-slate-900">{violationCount}</span>
                 </p>
+                {fullscreenModalOpen && (
+                  <p className="mt-2 text-sm font-semibold text-orange-700">Attempted fullscreen exit detected</p>
+                )}
               </div>
               <Timer label="Time Left" value={timeLeft === null ? '...' : `${timeLeft}s`} />
             </div>

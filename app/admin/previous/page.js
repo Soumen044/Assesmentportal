@@ -24,6 +24,15 @@ export default function PreviousPage() {
   const [violationsData, setViolationsData] = useState(null);
   const [message, setMessage] = useState('');
   const [downloadingId, setDownloadingId] = useState('');
+  const [downloadingPdfId, setDownloadingPdfId] = useState('');
+
+  const formatViolationSummary = (summary = {}) => {
+    const entries = Object.entries(summary);
+    if (!entries.length) {
+      return 'None';
+    }
+    return entries.map(([type, count]) => `${type} (${count})`).join(', ');
+  };
 
   const loadAssessments = async () => {
     const response = await api.get('/api/assessments');
@@ -90,6 +99,28 @@ export default function PreviousPage() {
     }
   };
 
+  const handleExportPdf = async (sessionId) => {
+    setDownloadingPdfId(sessionId);
+    setMessage('');
+    try {
+      const response = await api.get(`/api/admin/export-pdf/${sessionId}`, {
+        responseType: 'blob'
+      });
+      const blobUrl = window.URL.createObjectURL(new Blob([response.data], { type: 'application/pdf' }));
+      const link = document.createElement('a');
+      link.href = blobUrl;
+      link.download = `${sessionId}-results.pdf`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(blobUrl);
+    } catch (err) {
+      setMessage(err.response?.data?.error || 'PDF export failed');
+    } finally {
+      setDownloadingPdfId('');
+    }
+  };
+
   return (
     <main className="page-shell surface-grid">
       <div className="page-wrap">
@@ -132,6 +163,9 @@ export default function PreviousPage() {
                     <button className="btn-outline" onClick={() => handleSelect(session)}>View</button>
                     <button className="btn-primary" onClick={() => handleExport(session.sessionId)} disabled={downloadingId === session.sessionId}>
                       {downloadingId === session.sessionId ? 'Exporting...' : 'Export CSV'}
+                    </button>
+                    <button className="btn-outline" onClick={() => handleExportPdf(session.sessionId)} disabled={downloadingPdfId === session.sessionId}>
+                      {downloadingPdfId === session.sessionId ? 'Exporting PDF...' : 'Export PDF'}
                     </button>
                     <button className="btn-accent" onClick={() => handleDelete(session.sessionId)}>Delete Session</button>
                   </div>
@@ -203,19 +237,42 @@ export default function PreviousPage() {
                 </div>
 
                 <div className="card">
-                  <h3 className="section-title text-xl">Participants</h3>
-                  <div className="mt-4 space-y-3">
-                    {selectedStudents.map((student) => (
-                      <div key={student.studentId} className="rounded-[22px] border border-[rgba(17,33,61,0.08)] bg-white/70 p-4">
-                        <p className="font-semibold text-slate-900">{student.name}</p>
-                        <p className="mt-1 text-sm text-slate-500">{student.phone}</p>
-                        <p className="mt-2 text-sm text-slate-600">Status: {student.status}</p>
-                        <p className="mt-1 text-sm text-slate-600">Score: {student.score || 0}</p>
-                        <p className="mt-1 text-sm text-slate-600">
-                          Correct: {student.correctCount || 0}/{student.totalQuestions || 0} | Accuracy: {student.accuracy || 0}%
-                        </p>
-                      </div>
-                    ))}
+                  <h3 className="section-title text-xl">Participants Leaderboard</h3>
+                  <div className="mt-4 overflow-x-auto">
+                    <table className="min-w-full text-sm">
+                      <thead>
+                        <tr className="border-b border-[rgba(17,33,61,0.08)] text-left text-slate-500">
+                          <th className="px-3 py-3 font-medium">Rank</th>
+                          <th className="px-3 py-3 font-medium">Name</th>
+                          <th className="px-3 py-3 font-medium">Phone</th>
+                          <th className="px-3 py-3 font-medium">Score</th>
+                          <th className="px-3 py-3 font-medium">Correct</th>
+                          <th className="px-3 py-3 font-medium">Accuracy</th>
+                          <th className="px-3 py-3 font-medium">Violations</th>
+                          <th className="px-3 py-3 font-medium">Violation Types</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {selectedStudents.map((student) => (
+                          <tr key={student.studentId} className="border-b border-[rgba(17,33,61,0.06)] align-top text-slate-700">
+                            <td className="px-3 py-3 font-semibold text-slate-900">{student.rank || '-'}</td>
+                            <td className="px-3 py-3">
+                              <div className="font-semibold text-slate-900">{student.name}</div>
+                              <div className="mt-1 text-xs text-slate-500">{student.status}</div>
+                              {student.attemptedFullscreenExit && (
+                                <div className="mt-1 text-xs font-semibold text-orange-700">Attempted fullscreen exit</div>
+                              )}
+                            </td>
+                            <td className="px-3 py-3">{student.phone}</td>
+                            <td className="px-3 py-3 font-semibold text-slate-900">{student.score || 0}</td>
+                            <td className="px-3 py-3">{student.correctCount || 0}/{student.totalQuestions || 0}</td>
+                            <td className="px-3 py-3">{student.accuracy || 0}%</td>
+                            <td className="px-3 py-3">{student.violationCount || 0}</td>
+                            <td className="px-3 py-3">{formatViolationSummary(student.violationSummary)}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
                   </div>
                 </div>
               </div>
