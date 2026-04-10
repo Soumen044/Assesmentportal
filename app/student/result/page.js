@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import api from '../../../lib/api';
+import MathText from '../../../components/MathText';
 
 export default function StudentResultPage() {
   const [resultPayload, setResultPayload] = useState(null);
@@ -90,7 +91,10 @@ export default function StudentResultPage() {
             {result.reviewedQuestions.map((item) => (
               <div key={item.id} className="card-strong">
                 <div className="flex flex-wrap items-center justify-between gap-3">
-                  <p className="font-semibold text-slate-900">Q{item.index}. {item.question}</p>
+                  <div className="font-semibold text-slate-900">
+                    <span>Q{item.index}. </span>
+                    <MathText text={item.question} />
+                  </div>
                   <span className={item.isCorrect ? 'badge-blue' : 'badge-orange'}>
                     {item.isCorrect ? '+100 points' : '0 points'}
                   </span>
@@ -111,7 +115,7 @@ export default function StudentResultPage() {
                       }`}
                     >
                       <strong className="mr-2">{key}.</strong>
-                      {value}
+                      <MathText text={value} />
                     </div>
                   ))}
                 </div>

@@ -13,6 +13,7 @@ import {
 } from 'chart.js';
 import AdminNav from '../../../components/AdminNav';
 import api from '../../../lib/api';
+import MathText from '../../../components/MathText';
 
 ChartJS.register(CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend);
 
@@ -227,7 +228,10 @@ export default function PreviousPage() {
                   <div className="mt-4 space-y-3">
                     {selectedQuestions.map((question, index) => (
                       <div key={question.id} className="rounded-[22px] border border-[rgba(17,33,61,0.08)] bg-white/70 p-4">
-                        <p className="font-semibold text-slate-900">Q{index + 1}. {question.question}</p>
+                        <div className="font-semibold text-slate-900">
+                          <span>Q{index + 1}. </span>
+                          <MathText text={question.question} />
+                        </div>
                         <p className="mt-2 text-sm text-slate-500">
                           Dedicated time: {question.customTime ? `${question.customTime}s` : 'Uses default'}
                         </p>

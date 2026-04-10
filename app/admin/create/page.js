@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from 'react';
 import AdminNav from '../../../components/AdminNav';
 import Stepper from '../../../components/Stepper';
 import QuestionBuilder from '../../../components/QuestionBuilder';
+import MathText from '../../../components/MathText';
 import api from '../../../lib/api';
 
 const steps = ['Create Session', 'Question Canvas', 'Timing', 'Confirm'];
@@ -48,6 +49,7 @@ export default function CreateAssessmentPage() {
   const [loading, setLoading] = useState(false);
   const [draggedQuestionId, setDraggedQuestionId] = useState('');
   const [previewOpen, setPreviewOpen] = useState(true);
+  const [editingQuestion, setEditingQuestion] = useState(null);
 
   const sessionReady = Boolean(session.sessionId && session.password);
   const sampleTemplateUrl = `${process.env.NEXT_PUBLIC_API_BASE_URL || ''}/api/assessments/sample-template`;
@@ -124,6 +126,37 @@ export default function CreateAssessmentPage() {
     } finally {
       setLoading(false);
       event.target.value = '';
+    }
+  };
+
+  const handleDeleteQuestion = async (questionId) => {
+    setLoading(true);
+    setMessage('');
+    try {
+      await api.delete(`/api/assessments/${session.sessionId}/questions/${questionId}`);
+      await refreshQuestions();
+      if (editingQuestion?.id === questionId) {
+        setEditingQuestion(null);
+      }
+      setMessage('Question deleted from the canvas.');
+    } catch (err) {
+      setMessage(err.response?.data?.error || 'Unable to delete question');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleDuplicateQuestion = async (questionId) => {
+    setLoading(true);
+    setMessage('');
+    try {
+      await api.post(`/api/assessments/${session.sessionId}/questions/${questionId}/duplicate`);
+      await refreshQuestions();
+      setMessage('Question duplicated.');
+    } catch (err) {
+      setMessage(err.response?.data?.error || 'Unable to duplicate question');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -319,13 +352,25 @@ export default function CreateAssessmentPage() {
                       <div>
                         <p className="section-kicker">Manual Builder</p>
                         <div className="mt-3 rounded-[28px] border border-[rgba(29,114,255,0.1)] bg-white/80 p-4">
-                          <QuestionBuilder sessionId={session.sessionId} onAdded={refreshQuestions} />
+                          <QuestionBuilder
+                            sessionId={session.sessionId}
+                            onAdded={refreshQuestions}
+                            mode={editingQuestion ? 'edit' : 'create'}
+                            initialValues={editingQuestion}
+                            onCancel={() => setEditingQuestion(null)}
+                            submitLabel={editingQuestion ? 'Save Canvas Changes' : 'Add Question'}
+                          />
                         </div>
                       </div>
                     </div>
 
                     <div>
-                      <p className="section-kicker">Drag-and-Drop Order</p>
+                      <div className="flex flex-wrap items-center justify-between gap-3">
+                        <p className="section-kicker">Drag-and-Drop Order</p>
+                        <span className="text-xs text-slate-500">
+                          Edit, duplicate, delete, and reorder questions before publishing.
+                        </span>
+                      </div>
                       <div className="mt-3 space-y-3">
                         {!questions.length && (
                           <div className="card text-sm text-slate-500">No questions yet. Create or upload at least one question to continue.</div>
@@ -341,15 +386,29 @@ export default function CreateAssessmentPage() {
                           >
                             <div className="flex flex-wrap items-center justify-between gap-3">
                               <div>
-                                <p className="font-semibold text-slate-900">Q{index + 1}. {question.question}</p>
+                                <p className="font-semibold text-slate-900">Q{index + 1}.</p>
+                                <div className="mt-1 text-slate-800">
+                                  <MathText text={question.question} />
+                                </div>
                                 <p className="mt-1 text-sm text-slate-500">
                                   Time: {question.customTime ? `${question.customTime}s dedicated` : `${settings.perQuestionTime || 60}s default`}
                                 </p>
                               </div>
-                              <div className="flex gap-2">
+                              <div className="flex flex-wrap gap-2">
+                                <button className="btn-ghost" onClick={() => setEditingQuestion(question)}>Edit</button>
+                                <button className="btn-ghost" onClick={() => handleDuplicateQuestion(question.id)} disabled={loading}>Duplicate</button>
+                                <button className="btn-ghost" onClick={() => handleDeleteQuestion(question.id)} disabled={loading}>Delete</button>
                                 <button className="btn-ghost" onClick={() => moveQuestion(index, -1)} disabled={index === 0}>Up</button>
                                 <button className="btn-ghost" onClick={() => moveQuestion(index, 1)} disabled={index === questions.length - 1}>Down</button>
                               </div>
+                            </div>
+                            <div className="mt-4 grid gap-2 md:grid-cols-2">
+                              {Object.entries(question.options || {}).map(([key, value]) => (
+                                <div key={key} className={`rounded-2xl px-4 py-3 text-sm ${question.answer === key ? 'bg-[rgba(29,114,255,0.08)] text-blue-900' : 'bg-slate-50 text-slate-600'}`}>
+                                  <span className="font-semibold">{key}.</span>{' '}
+                                  <MathText text={value} />
+                                </div>
+                              ))}
                             </div>
                           </div>
                         ))}
@@ -443,7 +502,10 @@ export default function CreateAssessmentPage() {
                         <div key={question.id} className="card">
                           <div className="flex flex-wrap items-center justify-between gap-3">
                             <div>
-                              <p className="font-semibold text-slate-900">Q{index + 1}. {question.question}</p>
+                              <p className="font-semibold text-slate-900">Q{index + 1}.</p>
+                              <div className="mt-1 text-slate-800">
+                                <MathText text={question.question} />
+                              </div>
                               <p className="mt-1 text-sm text-slate-500">
                                 Time guideline: {settings.mode === 'total'
                                   ? 'Uses total exam timer'
@@ -457,7 +519,8 @@ export default function CreateAssessmentPage() {
                           <div className="mt-4 grid gap-2 md:grid-cols-2">
                             {Object.entries(question.options || {}).map(([key, value]) => (
                               <div key={key} className="rounded-2xl bg-slate-50 px-4 py-3 text-sm text-slate-600">
-                                <span className="font-semibold text-slate-900">{key}.</span> {value}
+                                <span className="font-semibold text-slate-900">{key}.</span>{' '}
+                                <MathText text={value} />
                               </div>
                             ))}
                           </div>

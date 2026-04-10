@@ -1,5 +1,6 @@
 import { Manrope, Sora } from 'next/font/google';
 import './globals.css';
+import 'katex/dist/katex.min.css';
 
 const bodyFont = Manrope({
   subsets: ['latin'],

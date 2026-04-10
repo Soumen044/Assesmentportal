@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import api from '../../../lib/api';
 import Timer from '../../../components/Timer';
+import MathText from '../../../components/MathText';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || '';
 
@@ -379,7 +380,9 @@ export default function ExamPage() {
                 {settings.mode === 'total' ? 'Total timer running' : `${getQuestionTime(question, settings)}s for this question`}
               </span>
             </div>
-            <h2 className="mt-4 text-2xl font-semibold text-slate-900">{question.question}</h2>
+            <div className="mt-4 text-2xl font-semibold text-slate-900">
+              <MathText text={question.question} />
+            </div>
             {question.image && (
               <img src={question.image} alt="Question" className="mt-5 max-h-72 rounded-[24px] border border-[rgba(17,33,61,0.08)] object-contain p-3" />
             )}
@@ -395,7 +398,7 @@ export default function ExamPage() {
                   onClick={() => handleSelect(key)}
                 >
                   <strong className="mr-2">{key}.</strong>
-                  {value}
+                  <MathText text={value} />
                 </button>
               ))}
             </div>
