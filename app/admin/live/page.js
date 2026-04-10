@@ -162,6 +162,10 @@ export default function LivePage() {
                       <p className="section-kicker">Questions</p>
                       <p className="mt-2 text-lg font-semibold">{session.questionCount || 0}</p>
                     </div>
+                    <div className="stat-card md:col-span-2">
+                      <p className="section-kicker">Creator</p>
+                      <p className="mt-2 text-lg font-semibold">{session.createdBy || 'Unknown'}</p>
+                    </div>
                   </div>
                 </button>
               ))}
@@ -179,7 +183,7 @@ export default function LivePage() {
                 <span className="badge-orange">{activeStudentCount} live</span>
               </div>
               {selectedSession && (
-                <div className="mt-6 grid gap-4 md:grid-cols-3">
+                <div className="mt-6 grid gap-4 md:grid-cols-4">
                   <div className="stat-card">
                     <p className="section-kicker">Session ID</p>
                     <p className="mt-2 text-lg font-semibold">{selectedSession.sessionId}</p>
@@ -191,6 +195,10 @@ export default function LivePage() {
                   <div className="stat-card">
                     <p className="section-kicker">Question Count</p>
                     <p className="mt-2 text-lg font-semibold">{selectedSession.questionCount || 0}</p>
+                  </div>
+                  <div className="stat-card">
+                    <p className="section-kicker">Creator</p>
+                    <p className="mt-2 text-lg font-semibold">{selectedSession.createdBy || 'Unknown'}</p>
                   </div>
                 </div>
               )}

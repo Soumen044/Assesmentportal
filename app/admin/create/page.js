@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from 'react';
 import AdminNav from '../../../components/AdminNav';
 import Stepper from '../../../components/Stepper';
 import QuestionBuilder from '../../../components/QuestionBuilder';
+import BulkQuestionTable from '../../../components/BulkQuestionTable';
 import MathText from '../../../components/MathText';
 import api from '../../../lib/api';
 
@@ -306,6 +307,10 @@ export default function CreateAssessmentPage() {
                   <p className="text-xs uppercase tracking-[0.2em] text-slate-400">Shuffle</p>
                   <p className="mt-2 text-lg font-semibold">{settings.shuffle ? 'Enabled' : 'Disabled'}</p>
                 </div>
+                <div className="stat-card">
+                  <p className="text-xs uppercase tracking-[0.2em] text-slate-400">Created By</p>
+                  <p className="mt-2 text-lg font-semibold">{session.createdBy || 'Current admin'}</p>
+                </div>
               </div>
             </div>
           </aside>
@@ -419,6 +424,16 @@ export default function CreateAssessmentPage() {
                 <div className="flex justify-end">
                   <button className="btn-primary" onClick={() => setStep(2)} disabled={!questions.length}>Next: Timing Settings</button>
                 </div>
+                {questions.length > 0 && (
+                  <BulkQuestionTable
+                    sessionId={session.sessionId}
+                    questions={questions}
+                    onSaved={refreshQuestions}
+                    onDelete={handleDeleteQuestion}
+                    onDuplicate={handleDuplicateQuestion}
+                    onEdit={setEditingQuestion}
+                  />
+                )}
               </div>
             )}
 

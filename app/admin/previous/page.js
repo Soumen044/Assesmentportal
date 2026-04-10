@@ -67,7 +67,14 @@ export default function PreviousPage() {
 
   const handleDelete = async (sessionId) => {
     setMessage('');
-    await api.delete(`/api/assessments/${sessionId}`);
+    const password = window.prompt('Enter the creator admin password to delete this session.');
+    if (!password) {
+      setMessage('Session deletion cancelled.');
+      return;
+    }
+    await api.delete(`/api/assessments/${sessionId}`, {
+      data: { password }
+    });
     if (selected?.sessionId === sessionId) {
       setSelected(null);
       setSelectedQuestions([]);
@@ -146,7 +153,7 @@ export default function PreviousPage() {
                     </div>
                     <span className={session.status === 'active' ? 'badge-orange' : 'badge-slate'}>{session.status}</span>
                   </div>
-                  <div className="mt-4 grid gap-3 sm:grid-cols-3">
+                  <div className="mt-4 grid gap-3 sm:grid-cols-4">
                     <div className="stat-card">
                       <p className="section-kicker">Password</p>
                       <p className="mt-2 text-base font-semibold tracking-[0.15em]">{session.password}</p>
@@ -158,6 +165,10 @@ export default function PreviousPage() {
                     <div className="stat-card">
                       <p className="section-kicker">Students</p>
                       <p className="mt-2 text-lg font-semibold">{session.studentCount || 0}</p>
+                    </div>
+                    <div className="stat-card">
+                      <p className="section-kicker">Creator</p>
+                      <p className="mt-2 text-base font-semibold">{session.createdBy || 'Unknown'}</p>
                     </div>
                   </div>
                   <div className="mt-4 flex flex-wrap gap-2">

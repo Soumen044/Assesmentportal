@@ -43,6 +43,7 @@ export default function QuestionBuilder({
   const [form, setForm] = useState(() => createFormState(initialValues));
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState('');
+  const [imageUploading, setImageUploading] = useState(false);
 
   useEffect(() => {
     setForm(createFormState(initialValues));
@@ -59,6 +60,30 @@ export default function QuestionBuilder({
     C: form.C,
     D: form.D
   }), [form.A, form.B, form.C, form.D]);
+
+  const handleImageUpload = async (event) => {
+    const file = event.target.files?.[0];
+    if (!file) {
+      return;
+    }
+
+    setImageUploading(true);
+    setMessage('');
+    try {
+      const formData = new FormData();
+      formData.append('image', file);
+      const response = await api.post('/api/assessments/question-image/upload', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      });
+      setForm((prev) => ({ ...prev, image: response.data.imageUrl || '' }));
+      setMessage('Question image uploaded.');
+    } catch (err) {
+      setMessage(err.response?.data?.error || 'Unable to upload image');
+    } finally {
+      setImageUploading(false);
+      event.target.value = '';
+    }
+  };
 
   const handleSubmit = async () => {
     if (!sessionId) {
@@ -128,6 +153,19 @@ export default function QuestionBuilder({
         <input className="input" placeholder="Image URL (optional)" value={form.image} onChange={handleChange('image')} />
         <input className="input" placeholder="Dedicated time in seconds" type="number" min="0" value={form.customTime} onChange={handleChange('customTime')} />
       </div>
+      <div className="grid gap-3 md:grid-cols-[1fr_auto]">
+        <input className="input" type="file" accept="image/*" onChange={handleImageUpload} disabled={imageUploading} />
+        <button className="btn-outline" type="button" onClick={() => setForm((prev) => ({ ...prev, image: '' }))} disabled={!form.image}>
+          Clear Image
+        </button>
+      </div>
+      {imageUploading && <p className="text-sm text-slate-500">Uploading image...</p>}
+      {form.image && (
+        <div className="rounded-[22px] border border-[rgba(17,33,61,0.08)] bg-slate-50 p-4">
+          <p className="section-kicker">Image Preview</p>
+          <img src={form.image} alt="Question preview" className="mt-3 max-h-48 rounded-[18px] object-contain" />
+        </div>
+      )}
 
       <div className="rounded-[26px] border border-[rgba(255,138,42,0.12)] bg-white/90 p-5">
         <p className="section-kicker">Live Preview</p>
