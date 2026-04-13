@@ -441,7 +441,24 @@ export default function CreateAssessmentPage() {
               <div className="card-strong fade-rise">
                 <div className="badge-orange">Step 3</div>
                 <h2 className="section-title mt-3">Timing and behavior settings</h2>
-                <p className="mt-2 text-sm text-slate-600">Choose a global timer strategy. Any question can still override the default per-question timer.</p>
+                <p className="mt-2 text-sm text-slate-600">
+                  Define the whole-assessment clock or the default per-question timer. Dedicated question timers always override the default and are shown below.
+                </p>
+
+                <div className="mt-6 grid gap-4 md:grid-cols-3">
+                  <div className="stat-card">
+                    <p className="section-kicker">Question Count</p>
+                    <p className="mt-2 text-2xl font-semibold">{questions.length}</p>
+                  </div>
+                  <div className="stat-card">
+                    <p className="section-kicker">Current Timing Mode</p>
+                    <p className="mt-2 text-lg font-semibold">{settings.mode === 'total' ? 'Whole Assessment' : 'Per Question'}</p>
+                  </div>
+                  <div className="stat-card">
+                    <p className="section-kicker">Projected Total Time</p>
+                    <p className="mt-2 text-lg font-semibold">{formatSeconds(totalPreviewTime)}</p>
+                  </div>
+                </div>
 
                 <div className="mt-6 grid gap-4 md:grid-cols-2">
                   <div>
@@ -468,6 +485,52 @@ export default function CreateAssessmentPage() {
                   <input type="checkbox" checked={settings.shuffle} onChange={(event) => setSettings((prev) => ({ ...prev, shuffle: event.target.checked }))} />
                   Shuffle questions when the exam starts
                 </label>
+
+                <div className="mt-6 rounded-[28px] border border-[rgba(17,33,61,0.08)] bg-white/80 p-5">
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <div>
+                      <p className="section-kicker">Question Timing Map</p>
+                      <h3 className="mt-2 text-xl font-semibold text-slate-900">Focused timing control</h3>
+                    </div>
+                    <span className="badge-blue">
+                      {settings.mode === 'total' ? 'Assessment timer active' : 'Per-question timer active'}
+                    </span>
+                  </div>
+                  <div className="mt-4 overflow-x-auto">
+                    <table className="min-w-full text-sm">
+                      <thead>
+                        <tr className="border-b border-[rgba(17,33,61,0.08)] text-left text-slate-500">
+                          <th className="px-3 py-3 font-medium">Q</th>
+                          <th className="px-3 py-3 font-medium">Prompt</th>
+                          <th className="px-3 py-3 font-medium">Timer Applied</th>
+                          <th className="px-3 py-3 font-medium">Source</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {questions.map((question, index) => (
+                          <tr key={question.id} className="border-b border-[rgba(17,33,61,0.06)] align-top">
+                            <td className="px-3 py-3 font-semibold text-slate-900">{index + 1}</td>
+                            <td className="px-3 py-3 text-slate-700">
+                              <MathText text={question.question} />
+                            </td>
+                            <td className="px-3 py-3 font-medium text-slate-900">
+                              {settings.mode === 'total'
+                                ? formatSeconds(settings.totalTime)
+                                : formatSeconds(question.customTime || settings.perQuestionTime)}
+                            </td>
+                            <td className="px-3 py-3 text-slate-600">
+                              {settings.mode === 'total'
+                                ? 'Whole assessment timer'
+                                : question.customTime
+                                  ? 'Dedicated question timer'
+                                  : 'Default question timer'}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
 
                 <div className="mt-6 flex gap-3">
                   <button className="btn-outline" onClick={() => setStep(1)}>Back to Canvas</button>

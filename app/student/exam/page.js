@@ -7,6 +7,7 @@ import Timer from '../../../components/Timer';
 import MathText from '../../../components/MathText';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || '';
+const SKIPPED_TOKEN = '__SKIPPED__';
 
 function getQuestionTime(question, settings) {
   const customTime = Number(question?.customTime || 0);
@@ -34,6 +35,7 @@ export default function ExamPage() {
   const warningTimerRef = useRef(null);
   const fullscreenModalTimerRef = useRef(null);
   const fullscreenViolationLoggedRef = useRef(false);
+  const timeoutTransitionRef = useRef(false);
 
   const pushWarning = (warning) => {
     if (warningTimerRef.current) {
@@ -121,10 +123,18 @@ export default function ExamPage() {
   };
 
   useEffect(() => {
-    if (timerReadyRef.current && timeLeft === 0 && questions.length) {
-      handleAutoSubmit('timeout');
+    if (!timerReadyRef.current || timeLeft !== 0 || !questions.length || timeoutTransitionRef.current) {
+      return;
     }
-  }, [timeLeft, questions.length]);
+
+    if (settings.mode === 'per-question') {
+      timeoutTransitionRef.current = true;
+      handleQuestionTimeout();
+      return;
+    }
+
+    handleAutoSubmit('timeout');
+  }, [timeLeft, questions.length, settings.mode]);
 
   useEffect(() => {
     if (!fullscreenModalOpen) {
@@ -307,11 +317,40 @@ export default function ExamPage() {
     }
   };
 
-  const handleNext = async () => {
-    await saveAnswer();
+  const toggleSkip = (checked) => {
+    const question = questions[currentIndex];
+    setAnswers((prev) => ({
+      ...prev,
+      [question.id]: checked ? SKIPPED_TOKEN : ''
+    }));
+  };
+
+  const activeQuestion = questions[currentIndex];
+  const getCurrentResponse = () => (activeQuestion ? answers[activeQuestion.id] || '' : '');
+  const currentResponse = questions.length ? getCurrentResponse() : '';
+  const currentSkipped = currentResponse === SKIPPED_TOKEN;
+  const selectedOption = currentSkipped ? '' : currentResponse;
+
+  const advanceQuestion = async (responseValue, reasonMessage) => {
+    await saveAnswer(responseValue);
     if (currentIndex < questions.length - 1) {
       setCurrentIndex((prev) => prev + 1);
+      if (reasonMessage) {
+        pushWarning(reasonMessage);
+      }
+      timeoutTransitionRef.current = false;
+      return;
     }
+    timeoutTransitionRef.current = false;
+    await handleAutoSubmit(reasonMessage === 'Current question timed out. It was marked as skipped.' ? 'timeout' : 'manual');
+  };
+
+  const handleNext = async () => {
+    if (!currentResponse) {
+      pushWarning('Answer the question or mark it as skipped before moving forward.');
+      return;
+    }
+    await advanceQuestion(currentResponse, currentSkipped ? 'Question skipped. Moved to the next question.' : '');
   };
 
   const handlePrev = () => {
@@ -321,8 +360,26 @@ export default function ExamPage() {
   };
 
   const handleManualSubmit = async () => {
-    await saveAnswer();
-    await handleAutoSubmit('manual');
+    if (!currentResponse) {
+      pushWarning('Answer the question or mark it as skipped before submitting.');
+      return;
+    }
+    await saveAnswer(currentResponse);
+    await handleAutoSubmit(currentSkipped ? 'manual-skipped' : 'manual');
+  };
+
+  const handleQuestionTimeout = async () => {
+    const timedOutResponse = currentResponse || SKIPPED_TOKEN;
+    if (!currentResponse) {
+      setAnswers((prev) => ({ ...prev, [question.id]: SKIPPED_TOKEN }));
+    }
+    if (currentIndex < questions.length - 1) {
+      await advanceQuestion(timedOutResponse, 'Current question timed out. It was marked as skipped.');
+      return;
+    }
+    await saveAnswer(timedOutResponse);
+    timeoutTransitionRef.current = false;
+    await handleAutoSubmit('timeout');
   };
 
   if (!questions.length) {
@@ -333,7 +390,11 @@ export default function ExamPage() {
     );
   }
 
-  const question = questions[currentIndex];
+  const question = activeQuestion;
+  const currentQuestionTime = settings.mode === 'total' ? Number(timeLeft || 0) : getQuestionTime(question, settings);
+  const actionTimerLabel = settings.mode === 'total'
+    ? `Whole assessment time remaining: ${timeLeft ?? '...'}s`
+    : `Answer window for this question: ${timeLeft ?? currentQuestionTime}s`;
 
   return (
     <main className="page-shell surface-grid">
@@ -391,7 +452,7 @@ export default function ExamPage() {
                 <button
                   key={key}
                   className={`rounded-[24px] border px-5 py-4 text-left transition ${
-                    answers[question.id] === key
+                    selectedOption === key
                       ? 'border-[rgba(29,114,255,0.28)] bg-[rgba(29,114,255,0.12)] text-blue-900'
                       : 'border-[rgba(17,33,61,0.08)] bg-white/80 text-slate-700 hover:border-[rgba(255,138,42,0.24)] hover:bg-[rgba(255,138,42,0.08)]'
                   }`}
@@ -402,15 +463,28 @@ export default function ExamPage() {
                 </button>
               ))}
             </div>
+            <label className="mt-5 flex items-center gap-3 rounded-2xl border border-[rgba(255,138,42,0.14)] bg-[rgba(255,138,42,0.08)] px-4 py-3 text-sm text-slate-700">
+              <input type="checkbox" checked={currentSkipped} onChange={(event) => toggleSkip(event.target.checked)} />
+              Skip this question
+            </label>
           </div>
 
-          <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="space-y-3">
+            <div className="rounded-2xl border border-[rgba(29,114,255,0.12)] bg-[rgba(29,114,255,0.06)] px-4 py-3 text-sm font-medium text-slate-700">
+              {actionTimerLabel}
+            </div>
+            <div className="flex flex-wrap items-center justify-between gap-3">
             <button className="btn-outline" onClick={handlePrev} disabled={currentIndex === 0}>Previous</button>
             {currentIndex < questions.length - 1 ? (
-              <button className="btn-primary" onClick={handleNext}>Save and Next</button>
+              <button className="btn-primary" onClick={handleNext}>
+                {currentSkipped ? 'Skip and Next' : 'Save and Next'}
+              </button>
             ) : (
-              <button className="btn-accent" onClick={handleManualSubmit}>Submit Exam</button>
+              <button className="btn-accent" onClick={handleManualSubmit}>
+                {currentSkipped ? 'Submit with Skip' : 'Submit Exam'}
+              </button>
             )}
+          </div>
           </div>
 
           {message && <div className="glass-banner text-sm text-slate-700">{message}</div>}

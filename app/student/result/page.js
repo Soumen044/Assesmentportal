@@ -63,7 +63,7 @@ export default function StudentResultPage() {
               </div>
               <Link className="btn-primary" href="/">Return Home</Link>
             </div>
-            <div className="mt-8 grid gap-4 md:grid-cols-4">
+            <div className="mt-8 grid gap-4 md:grid-cols-5">
               <div className="stat-card">
                 <p className="section-kicker">Score</p>
                 <p className="mt-2 text-3xl font-semibold text-slate-900">{result.score}</p>
@@ -80,6 +80,11 @@ export default function StudentResultPage() {
                 <p className="mt-1 text-xs text-slate-500">responses recorded</p>
               </div>
               <div className="stat-card">
+                <p className="section-kicker">Skipped</p>
+                <p className="mt-2 text-3xl font-semibold text-slate-900">{result.skippedCount}</p>
+                <p className="mt-1 text-xs text-slate-500">marked skip or timed out</p>
+              </div>
+              <div className="stat-card md:col-span-1">
                 <p className="section-kicker">Accuracy</p>
                 <p className="mt-2 text-3xl font-semibold text-slate-900">{result.accuracy}%</p>
                 <p className="mt-1 text-xs text-slate-500">based on total questions</p>
@@ -122,7 +127,7 @@ export default function StudentResultPage() {
                 <div className="mt-4 grid gap-3 md:grid-cols-3">
                   <div className="stat-card">
                     <p className="section-kicker">Your Answer</p>
-                    <p className="mt-2 text-lg font-semibold text-slate-900">{item.selectedAnswer || 'Not answered'}</p>
+                    <p className="mt-2 text-lg font-semibold text-slate-900">{item.skipped ? 'Skipped' : (item.selectedAnswer || 'Not answered')}</p>
                   </div>
                   <div className="stat-card">
                     <p className="section-kicker">Correct Answer</p>
