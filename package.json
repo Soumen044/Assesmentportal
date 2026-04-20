@@ -12,7 +12,7 @@
     "chart.js": "^4.4.3",
     "firebase": "^12.11.0",
     "katex": "^0.16.45",
-    "next": "14.2.35",
+    "next": "15.5.14",
     "react": "18.3.1",
     "react-chartjs-2": "^5.2.0",
     "react-dom": "18.3.1"
