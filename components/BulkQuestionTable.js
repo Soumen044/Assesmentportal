@@ -45,7 +45,7 @@ export default function BulkQuestionTable({
     setSavingId(row.id);
     setMessage('');
     try {
-      await api.put(`/api/assessments/${sessionId}/questions/${row.id}`, {
+      const response = await api.put(`/api/assessments/${sessionId}/questions/${row.id}`, {
         question: row.question,
         options: { A: row.A, B: row.B, C: row.C, D: row.D },
         answer: row.answer,
@@ -53,7 +53,7 @@ export default function BulkQuestionTable({
         image: row.image || ''
       });
       setMessage(`Saved Q${rows.findIndex((item) => item.id === row.id) + 1}.`);
-      onSaved?.();
+      onSaved?.(response.data.questions || []);
     } catch (err) {
       setMessage(err.response?.data?.error || 'Unable to save question');
     } finally {
@@ -65,18 +65,20 @@ export default function BulkQuestionTable({
     setSavingAll(true);
     setMessage('');
     try {
+      let latestQuestions = rows;
       for (const row of rows) {
         // eslint-disable-next-line no-await-in-loop
-        await api.put(`/api/assessments/${sessionId}/questions/${row.id}`, {
+        const response = await api.put(`/api/assessments/${sessionId}/questions/${row.id}`, {
           question: row.question,
           options: { A: row.A, B: row.B, C: row.C, D: row.D },
           answer: row.answer,
           customTime: Number(row.customTime || 0),
           image: row.image || ''
         });
+        latestQuestions = response.data.questions || latestQuestions;
       }
       setMessage('Bulk question updates saved.');
-      onSaved?.();
+      onSaved?.(latestQuestions);
     } catch (err) {
       setMessage(err.response?.data?.error || 'Unable to save all questions');
     } finally {
@@ -132,9 +134,9 @@ export default function BulkQuestionTable({
             {rows.map((row, index) => (
               <tr key={row.id} className="border-b border-[rgba(17,33,61,0.06)] align-top">
                 <td className="px-3 py-4 font-semibold text-slate-900">{index + 1}</td>
-                <td className="px-3 py-4 min-w-[280px]">
+                <td className="px-3 py-3 min-w-[280px]">
                   <textarea
-                    className="textarea min-h-[120px]"
+                    className="textarea min-h-[96px]"
                     value={row.question}
                     onChange={(event) => updateRow(row.id, { question: event.target.value })}
                   />
@@ -142,7 +144,7 @@ export default function BulkQuestionTable({
                     <MathText text={row.question || 'Question preview'} />
                   </div>
                 </td>
-                <td className="px-3 py-4 min-w-[260px]">
+                <td className="px-3 py-3 min-w-[260px]">
                   <div className="space-y-2">
                     {['A', 'B', 'C', 'D'].map((key) => (
                       <div key={key}>
@@ -156,7 +158,7 @@ export default function BulkQuestionTable({
                     ))}
                   </div>
                 </td>
-                <td className="px-3 py-4">
+                <td className="px-3 py-3">
                   <select className="input min-w-[90px]" value={row.answer} onChange={(event) => updateRow(row.id, { answer: event.target.value })}>
                     <option value="A">A</option>
                     <option value="B">B</option>
@@ -164,7 +166,7 @@ export default function BulkQuestionTable({
                     <option value="D">D</option>
                   </select>
                 </td>
-                <td className="px-3 py-4">
+                <td className="px-3 py-3">
                   <input
                     className="input min-w-[120px]"
                     type="number"
@@ -173,7 +175,7 @@ export default function BulkQuestionTable({
                     onChange={(event) => updateRow(row.id, { customTime: event.target.value })}
                   />
                 </td>
-                <td className="px-3 py-4 min-w-[220px]">
+                <td className="px-3 py-3 min-w-[220px]">
                   <div className="space-y-2">
                     <input className="input" value={row.image} placeholder="Image URL or uploaded data" onChange={(event) => updateRow(row.id, { image: event.target.value })} />
                     <input
@@ -191,7 +193,7 @@ export default function BulkQuestionTable({
                     {row.image && <img src={row.image} alt="Question" className="max-h-24 rounded-2xl object-contain" />}
                   </div>
                 </td>
-                <td className="px-3 py-4 min-w-[220px]">
+                <td className="px-3 py-3 min-w-[220px]">
                   <div className="flex flex-col gap-2">
                     <button className="btn-primary" onClick={() => saveRow(row)} disabled={savingId === row.id}>
                       {savingId === row.id ? 'Saving...' : 'Save Row'}

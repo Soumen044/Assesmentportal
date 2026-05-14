@@ -13,6 +13,11 @@ const links = [
 export default function AdminNav() {
   const pathname = usePathname();
   const router = useRouter();
+  const todayLabel = new Intl.DateTimeFormat('en-IN', {
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric'
+  }).format(new Date());
 
   const handleLogout = () => {
     localStorage.removeItem('adminToken');
@@ -20,20 +25,23 @@ export default function AdminNav() {
   };
 
   return (
-    <nav className="card-strong mb-6 flex flex-col gap-4 md:flex-row md:items-center md:justify-between fade-rise">
-      <div className="space-y-2">
-        <div className="badge-blue">Admin Control Deck</div>
+    <nav className="card-strong mb-4 flex flex-col gap-3 md:flex-row md:items-center md:justify-between fade-rise">
+      <div className="space-y-1 min-w-0">
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="badge-blue">Admin Control Deck</div>
+          <div className="badge-slate">{todayLabel}</div>
+        </div>
         <div>
-          <p className="section-title text-xl">Assessment Command Center</p>
-          <p className="text-sm text-slate-600">Manage sessions, timing, monitoring, and exports from one place.</p>
+          <p className="section-title text-lg">Assessment Command Center</p>
+          <p className="text-xs text-slate-600">Compact controls for sessions, monitoring, exports, and notifications.</p>
         </div>
       </div>
-      <div className="flex flex-wrap items-center gap-3">
+      <div className="flex flex-wrap items-center gap-2">
         {links.map((link) => (
           <Link
             key={link.href}
             href={link.href}
-            className={`rounded-full px-4 py-2 text-sm font-semibold transition ${
+            className={`rounded-full px-3 py-1.5 text-xs font-semibold transition ${
               pathname === link.href
                 ? 'bg-[rgba(29,114,255,0.12)] text-blue-700'
                 : 'bg-white/70 text-slate-600 hover:bg-[rgba(255,138,42,0.1)] hover:text-slate-900'

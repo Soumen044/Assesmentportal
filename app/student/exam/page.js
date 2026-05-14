@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useReducer, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import api from '../../../lib/api';
 import Timer from '../../../components/Timer';
@@ -9,207 +9,408 @@ import MathText from '../../../components/MathText';
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || '';
 const SKIPPED_TOKEN = '__SKIPPED__';
 
-function getQuestionTime(question, settings) {
-  const customTime = Number(question?.customTime || 0);
-  if (customTime > 0) {
-    return customTime;
-  }
-  return Number(settings?.perQuestionTime || 60);
+function formatClock(totalSeconds) {
+  const seconds = Math.max(0, Number(totalSeconds || 0));
+  const minutes = Math.floor(seconds / 60);
+  const remainder = seconds % 60;
+  return `${String(minutes).padStart(2, '0')}:${String(remainder).padStart(2, '0')}`;
 }
+
+function buildQuestionTimers(questions, settings, existing = {}) {
+  return questions.reduce((accumulator, question) => {
+    const defaultSeconds = Number(question.customTime || settings.defaultQuestionTime || 60);
+    accumulator[question.id] = Number(existing[question.id] ?? defaultSeconds);
+    return accumulator;
+  }, {});
+}
+
+function normalizeAnswerRecord(value) {
+  if (value && typeof value === 'object') {
+    return {
+      selectedOption: value.selectedOption || '',
+      skipped: Boolean(value.skipped),
+      timedOut: Boolean(value.timedOut),
+      touchedAt: Number(value.touchedAt || 0)
+    };
+  }
+
+  const normalized = String(value || '').trim().toUpperCase();
+  if (!normalized) {
+    return { selectedOption: '', skipped: false, timedOut: false, touchedAt: 0 };
+  }
+  if (normalized === SKIPPED_TOKEN) {
+    return { selectedOption: '', skipped: true, timedOut: false, touchedAt: 0 };
+  }
+  return { selectedOption: normalized, skipped: false, timedOut: false, touchedAt: 0 };
+}
+
+function reducer(state, action) {
+  switch (action.type) {
+    case 'INIT': {
+      return {
+        ...state,
+        phase: 'started',
+        ready: true,
+        sessionId: action.payload.sessionId,
+        studentId: action.payload.studentId,
+        settings: action.payload.settings,
+        questions: action.payload.questions,
+        answers: action.payload.answers,
+        currentIndex: action.payload.currentIndex,
+        totalRemaining: action.payload.totalRemaining,
+        questionRemaining: action.payload.questionRemaining,
+        violationCount: action.payload.violationCount,
+        violationThreshold: action.payload.violationThreshold
+      };
+    }
+    case 'SELECT_OPTION': {
+      return {
+        ...state,
+        answers: {
+          ...state.answers,
+          [action.questionId]: {
+            selectedOption: action.option,
+            skipped: false,
+            timedOut: false,
+            touchedAt: Date.now()
+          }
+        }
+      };
+    }
+    case 'TOGGLE_SKIP': {
+      return {
+        ...state,
+        answers: {
+          ...state.answers,
+          [action.questionId]: action.checked
+            ? { selectedOption: '', skipped: true, timedOut: false, touchedAt: Date.now() }
+            : { selectedOption: '', skipped: false, timedOut: false, touchedAt: Date.now() }
+        }
+      };
+    }
+    case 'SET_ANSWER_RECORD':
+      return {
+        ...state,
+        answers: {
+          ...state.answers,
+          [action.questionId]: action.answerRecord
+        }
+      };
+    case 'SET_WARNING':
+      return { ...state, message: action.message };
+    case 'CLEAR_WARNING':
+      return { ...state, message: '' };
+    case 'SET_VIOLATIONS':
+      return { ...state, violationCount: action.count };
+    case 'SET_MODAL':
+      return { ...state, fullscreenModalOpen: action.open, fullscreenCountdown: action.open ? 8 : state.fullscreenCountdown };
+    case 'SET_FULLSCREEN_COUNTDOWN':
+      return { ...state, fullscreenCountdown: action.value };
+    case 'TICK': {
+      const nextQuestionRemaining = { ...state.questionRemaining };
+      const currentQuestion = state.questions[state.currentIndex];
+      if (state.settings.enableQuestionTimer && currentQuestion) {
+        nextQuestionRemaining[currentQuestion.id] = Math.max(0, Number(nextQuestionRemaining[currentQuestion.id] || 0) - 1);
+      }
+      return {
+        ...state,
+        totalRemaining: state.settings.enableTotalTimer ? Math.max(0, Number(state.totalRemaining || 0) - 1) : state.totalRemaining,
+        questionRemaining: nextQuestionRemaining
+      };
+    }
+    case 'SET_INDEX':
+      return { ...state, currentIndex: action.index };
+    case 'ADVANCE': {
+      return { ...state, currentIndex: Math.min(state.questions.length - 1, state.currentIndex + 1) };
+    }
+    case 'SET_STATUS':
+      return { ...state, phase: action.status };
+    default:
+      return state;
+  }
+}
+
+const initialState = {
+  phase: 'boot',
+  ready: false,
+  sessionId: '',
+  studentId: '',
+  settings: {
+    enableTotalTimer: false,
+    totalTime: 0,
+    enableQuestionTimer: true,
+    defaultQuestionTime: 60,
+    shuffleQuestions: false,
+    shuffleOptions: false,
+    violationThreshold: 3
+  },
+  questions: [],
+  answers: {},
+  currentIndex: 0,
+  totalRemaining: 0,
+  questionRemaining: {},
+  violationCount: 0,
+  violationThreshold: 3,
+  fullscreenModalOpen: false,
+  fullscreenCountdown: 8,
+  message: ''
+};
 
 export default function ExamPage() {
   const router = useRouter();
-  const [questions, setQuestions] = useState([]);
-  const [settings, setSettings] = useState({ mode: 'per-question', perQuestionTime: 60, totalTime: 0, shuffle: false });
-  const [currentIndex, setCurrentIndex] = useState(0);
-  const [answers, setAnswers] = useState({});
-  const [timeLeft, setTimeLeft] = useState(null);
-  const [message, setMessage] = useState('');
-  const [violationCount, setViolationCount] = useState(0);
-  const [fullscreenModalOpen, setFullscreenModalOpen] = useState(false);
-  const [fullscreenCountdown, setFullscreenCountdown] = useState(8);
-  const submittingRef = useRef(false);
-  const timerReadyRef = useRef(false);
-  const safeExitRef = useRef(false);
-  const touchTrackerRef = useRef({ lastTapAt: 0 });
+  const [state, dispatch] = useReducer(reducer, initialState);
   const warningTimerRef = useRef(null);
   const fullscreenModalTimerRef = useRef(null);
+  const safeExitRef = useRef(false);
+  const submittingRef = useRef(false);
   const fullscreenViolationLoggedRef = useRef(false);
-  const timeoutTransitionRef = useRef(false);
+  const touchTrackerRef = useRef({ lastTapAt: 0 });
+  const queueRef = useRef([]);
+  const flushingRef = useRef(false);
 
-  const pushWarning = (warning) => {
+  const questions = state.questions;
+  const currentQuestion = questions[state.currentIndex];
+  const currentAnswer = normalizeAnswerRecord(currentQuestion ? state.answers[currentQuestion.id] : null);
+  const currentQuestionTime = currentQuestion ? Number(state.questionRemaining[currentQuestion.id] || 0) : 0;
+
+  const persistRuntime = useCallback((nextState) => {
+    if (!nextState.ready) {
+      return;
+    }
+    localStorage.setItem('examRuntime', JSON.stringify({
+      settings: nextState.settings,
+      manifest: { questions: nextState.questions, settingsSnapshot: nextState.settings },
+      answers: nextState.answers,
+      currentQuestion: nextState.currentIndex,
+      totalRemaining: nextState.totalRemaining,
+      questionRemaining: nextState.questionRemaining,
+      violationThreshold: nextState.violationThreshold,
+      violationCount: nextState.violationCount,
+      sessionId: nextState.sessionId,
+      studentId: nextState.studentId,
+      updatedAt: Date.now()
+    }));
+  }, []);
+
+  const pushWarning = useCallback((warning) => {
     if (warningTimerRef.current) {
       window.clearTimeout(warningTimerRef.current);
     }
-    setMessage(warning);
+    dispatch({ type: 'SET_WARNING', message: warning });
     warningTimerRef.current = window.setTimeout(() => {
-      setMessage((current) => (current === warning ? '' : current));
+      dispatch({ type: 'CLEAR_WARNING' });
     }, 3500);
-  };
-
-  useEffect(() => {
-    const storedQuestions = JSON.parse(localStorage.getItem('examQuestions') || '[]');
-    const storedSettings = JSON.parse(localStorage.getItem('examSettings') || '{}');
-    setQuestions(storedQuestions);
-    setSettings({
-      mode: storedSettings.mode || 'per-question',
-      perQuestionTime: storedSettings.perQuestionTime || 60,
-      totalTime: storedSettings.totalTime || 0,
-      shuffle: storedSettings.shuffle || false
-    });
-    return () => {
-      if (warningTimerRef.current) {
-        window.clearTimeout(warningTimerRef.current);
-      }
-      if (fullscreenModalTimerRef.current) {
-        window.clearInterval(fullscreenModalTimerRef.current);
-      }
-    };
   }, []);
 
-  useEffect(() => {
-    if (!questions.length) {
-      return;
-    }
-    if (settings.mode === 'total') {
-      setTimeLeft(Number(settings.totalTime || 0));
-      timerReadyRef.current = true;
-    }
-  }, [questions, settings.mode, settings.totalTime]);
-
-  useEffect(() => {
-    if (!questions.length || settings.mode !== 'per-question') {
-      return;
-    }
-    setTimeLeft(getQuestionTime(questions[currentIndex], settings));
-    timerReadyRef.current = true;
-  }, [questions, currentIndex, settings]);
-
-  useEffect(() => {
-    if (!questions.length || timeLeft === null || timeLeft <= 0) {
-      return undefined;
-    }
-    const timer = setInterval(() => {
-      setTimeLeft((previous) => {
-        if (previous === null || previous <= 0) {
-          return 0;
-        }
-        return previous - 1;
-      });
-    }, 1000);
-    return () => clearInterval(timer);
-  }, [timeLeft, questions.length]);
-
-  const navigateToResult = () => {
+  const navigateToResult = useCallback(() => {
     safeExitRef.current = true;
-    router.push('/student/result');
-  };
+    router.replace('/student/result');
+  }, [router]);
 
-  const handleAutoSubmit = async (reason) => {
-    if (submittingRef.current) {
+  const flushQueue = useCallback(async () => {
+    if (flushingRef.current) {
       return;
     }
-    submittingRef.current = true;
-    const sessionId = localStorage.getItem('studentSessionId');
-    const studentId = localStorage.getItem('studentId');
-    try {
-      await api.post('/api/students/auto-submit', { sessionId, studentId, reason });
-    } catch (err) {
-      // ignore submit errors on forced exit
-    }
-    localStorage.setItem('studentSubmitReason', reason);
-    setMessage('Exam submitted.');
-    navigateToResult();
-  };
-
-  useEffect(() => {
-    if (!timerReadyRef.current || timeLeft !== 0 || !questions.length || timeoutTransitionRef.current) {
-      return;
-    }
-
-    if (settings.mode === 'per-question') {
-      timeoutTransitionRef.current = true;
-      handleQuestionTimeout();
-      return;
-    }
-
-    handleAutoSubmit('timeout');
-  }, [timeLeft, questions.length, settings.mode]);
-
-  useEffect(() => {
-    if (!fullscreenModalOpen) {
-      if (fullscreenModalTimerRef.current) {
-        window.clearInterval(fullscreenModalTimerRef.current);
+    flushingRef.current = true;
+    while (queueRef.current.length) {
+      const task = queueRef.current[0];
+      try {
+        // eslint-disable-next-line no-await-in-loop
+        await task();
+        queueRef.current.shift();
+      } catch (err) {
+        break;
       }
-      setFullscreenCountdown(8);
-      return undefined;
     }
+    flushingRef.current = false;
+  }, []);
 
-    fullscreenModalTimerRef.current = window.setInterval(() => {
-      setFullscreenCountdown((previous) => {
-        if (previous <= 1) {
-          if (fullscreenModalTimerRef.current) {
-            window.clearInterval(fullscreenModalTimerRef.current);
-          }
-          handleAutoSubmit('fullscreen-exit');
-          return 0;
-        }
-        return previous - 1;
-      });
-    }, 1000);
+  const enqueue = useCallback((task) => {
+    queueRef.current.push(task);
+    flushQueue();
+  }, [flushQueue]);
 
-    return () => {
-      if (fullscreenModalTimerRef.current) {
-        window.clearInterval(fullscreenModalTimerRef.current);
-      }
-    };
-  }, [fullscreenModalOpen]);
+  const submitRuntimeAnswer = useCallback(async (questionId, answerRecord, currentQuestionIndex) => {
+    await api.post('/api/students/answer', {
+      sessionId: state.sessionId,
+      studentId: state.studentId,
+      questionId,
+      selectedOption: answerRecord.selectedOption || '',
+      skipped: Boolean(answerRecord.skipped),
+      timedOut: Boolean(answerRecord.timedOut),
+      currentQuestion: currentQuestionIndex
+    });
+  }, [state.sessionId, state.studentId]);
 
-  const reportViolation = async (type, warning) => {
-    const sessionId = localStorage.getItem('studentSessionId');
-    const studentId = localStorage.getItem('studentId');
-    if (!sessionId || !studentId) {
+  const reportViolation = useCallback(async (type, warning) => {
+    if (!state.sessionId || !state.studentId) {
       return;
     }
     if (warning) {
       pushWarning(warning);
     }
-    try {
-      await api.post('/api/students/violation', { sessionId, studentId, type });
-      setViolationCount((count) => {
-        const nextCount = count + 1;
-        if (nextCount >= 3) {
-          handleAutoSubmit('violation-threshold');
-        }
-        return nextCount;
+    enqueue(async () => {
+      const response = await api.post('/api/students/violation', {
+        sessionId: state.sessionId,
+        studentId: state.studentId,
+        type
       });
-    } catch (err) {
-      // ignore logging errors
+      const nextCount = Number(response.data?.violationCount || state.violationCount + 1);
+      dispatch({ type: 'SET_VIOLATIONS', count: nextCount });
+      if (nextCount >= state.violationThreshold && !submittingRef.current) {
+        await api.post('/api/students/auto-submit', {
+          sessionId: state.sessionId,
+          studentId: state.studentId,
+          reason: 'violation-threshold'
+        });
+        localStorage.setItem('studentSubmitReason', 'violation-threshold');
+        navigateToResult();
+      }
+    });
+  }, [enqueue, navigateToResult, pushWarning, state.sessionId, state.studentId, state.violationCount, state.violationThreshold]);
+
+  const handleAutoSubmit = useCallback(async (reason) => {
+    if (submittingRef.current) {
+      return;
     }
-  };
+    submittingRef.current = true;
+    dispatch({ type: 'SET_STATUS', status: 'submitting' });
+    try {
+      await flushQueue();
+      await api.post('/api/students/auto-submit', { sessionId: state.sessionId, studentId: state.studentId, reason });
+    } catch (err) {
+      // ignore forced submit failures
+    }
+    localStorage.setItem('studentSubmitReason', reason);
+    navigateToResult();
+  }, [flushQueue, navigateToResult, state.sessionId, state.studentId]);
 
   useEffect(() => {
-    const sessionId = localStorage.getItem('studentSessionId');
-    if (!sessionId) {
+    const saved = JSON.parse(localStorage.getItem('examRuntime') || '{}');
+    if (!saved?.sessionId || !saved?.studentId) {
+      router.replace('/student/instructions');
+      return;
+    }
+
+    const manifestQuestions = saved.manifest?.questions || saved.questions || [];
+    const normalizedAnswers = Object.entries(saved.answers || {}).reduce((accumulator, [questionId, value]) => {
+      accumulator[questionId] = normalizeAnswerRecord(value);
+      return accumulator;
+    }, {});
+    const settings = saved.settings || saved.manifest?.settingsSnapshot || initialState.settings;
+    const questionRemaining = buildQuestionTimers(manifestQuestions, settings, saved.questionRemaining || {});
+
+    dispatch({
+      type: 'INIT',
+      payload: {
+        sessionId: saved.sessionId,
+        studentId: saved.studentId,
+        settings,
+        questions: manifestQuestions,
+        answers: normalizedAnswers,
+        currentIndex: Math.min(Number(saved.currentQuestion || 0), Math.max(0, manifestQuestions.length - 1)),
+        totalRemaining: Number(saved.totalRemaining ?? settings.totalTime ?? 0),
+        questionRemaining,
+        violationCount: Number(saved.violationCount || 0),
+        violationThreshold: Number(saved.violationThreshold || settings.violationThreshold || 3)
+      }
+    });
+  }, [router]);
+
+  useEffect(() => {
+    if (!state.ready) {
+      return;
+    }
+    persistRuntime(state);
+  }, [persistRuntime, state]);
+
+  useEffect(() => {
+    if (!state.ready || state.phase !== 'started') {
+      return undefined;
+    }
+    const timer = window.setInterval(() => {
+      dispatch({ type: 'TICK' });
+    }, 1000);
+    return () => window.clearInterval(timer);
+  }, [state.phase, state.ready]);
+
+  useEffect(() => {
+    if (!state.ready || !currentQuestion || state.phase !== 'started') {
+      return;
+    }
+    if (state.settings.enableTotalTimer && Number(state.totalRemaining || 0) <= 0) {
+      handleAutoSubmit('timeout-total');
+      return;
+    }
+    if (!state.settings.enableQuestionTimer) {
+      return;
+    }
+    if (Number(state.questionRemaining[currentQuestion.id] || 0) > 0) {
+      return;
+    }
+
+    const timedOutAnswer = currentAnswer.selectedOption
+      ? { ...currentAnswer, timedOut: true, touchedAt: Date.now() }
+      : { selectedOption: '', skipped: true, timedOut: true, touchedAt: Date.now() };
+
+    const nextAnswers = {
+      ...state.answers,
+      [currentQuestion.id]: timedOutAnswer
+    };
+
+    dispatch({ type: 'SET_ANSWER_RECORD', questionId: currentQuestion.id, answerRecord: timedOutAnswer });
+    enqueue(() => submitRuntimeAnswer(currentQuestion.id, timedOutAnswer, Math.min(state.currentIndex + 1, questions.length - 1)));
+
+    if (state.currentIndex < questions.length - 1) {
+      pushWarning(currentAnswer.selectedOption ? 'Question time finished. Your selected answer was kept and the exam moved forward.' : 'Current question timed out and was marked as skipped.');
+      dispatch({ type: 'ADVANCE' });
+      persistRuntime({ ...state, answers: nextAnswers, currentIndex: state.currentIndex + 1 });
+      return;
+    }
+
+    persistRuntime({ ...state, answers: nextAnswers });
+    handleAutoSubmit(currentAnswer.selectedOption ? 'timeout-final-answered' : 'timeout-final-skipped');
+  }, [currentAnswer, currentQuestion, enqueue, handleAutoSubmit, persistRuntime, pushWarning, questions.length, state, submitRuntimeAnswer]);
+
+  useEffect(() => {
+    if (!state.ready || !state.sessionId || !state.studentId) {
       return undefined;
     }
 
-    const pollStatus = async () => {
+    const pollRuntime = async () => {
       try {
-        const response = await api.get(`/api/students/session-status/${sessionId}`);
-        if (response.data.session?.status === 'stopped' && !submittingRef.current) {
-          pushWarning('This session was stopped by the admin. Your exam is being submitted.');
-          handleAutoSubmit('session-stopped');
+        const response = await api.get(`/api/students/runtime/${state.sessionId}/${state.studentId}`);
+        const runtime = response.data;
+        if (runtime.student?.status === 'submitted' || runtime.student?.forcedStop || runtime.session?.status === 'stopped') {
+          pushWarning('This session is no longer active. Redirecting to your result.');
+          navigateToResult();
         }
       } catch (err) {
-        // ignore polling errors
+        // best effort
       }
     };
 
-    pollStatus();
-    const intervalId = window.setInterval(pollStatus, 5000);
-    return () => window.clearInterval(intervalId);
-  }, []);
+    const sendHeartbeat = async () => {
+      try {
+        await api.post('/api/students/heartbeat', {
+          sessionId: state.sessionId,
+          studentId: state.studentId,
+          context: 'exam'
+        });
+      } catch (err) {
+        // best effort
+      }
+    };
+
+    pollRuntime();
+    sendHeartbeat();
+    const runtimeInterval = window.setInterval(pollRuntime, 5000);
+    const heartbeatInterval = window.setInterval(sendHeartbeat, 15000);
+    return () => {
+      window.clearInterval(runtimeInterval);
+      window.clearInterval(heartbeatInterval);
+    };
+  }, [navigateToResult, pushWarning, state.ready, state.sessionId, state.studentId]);
 
   useEffect(() => {
     const handleVisibility = () => {
@@ -224,11 +425,8 @@ export default function ExamPage() {
       if (safeExitRef.current || submittingRef.current) {
         return;
       }
-
-      const sessionId = localStorage.getItem('studentSessionId');
-      const studentId = localStorage.getItem('studentId');
-      if (sessionId && studentId && navigator.sendBeacon) {
-        navigator.sendBeacon(`${API_BASE_URL}/api/students/exit/${sessionId}/${studentId}?reason=browser-close`);
+      if (state.sessionId && state.studentId && navigator.sendBeacon) {
+        navigator.sendBeacon(`${API_BASE_URL}/api/students/exit/${state.sessionId}/${state.studentId}?reason=browser-close`);
       }
       event.preventDefault();
       event.returnValue = '';
@@ -257,13 +455,19 @@ export default function ExamPage() {
           fullscreenViolationLoggedRef.current = true;
           reportViolation('fullscreen-exit-attempt', 'Fullscreen exit attempted. Return immediately or the exam will be auto-submitted.');
         }
-        setFullscreenModalOpen(true);
+        dispatch({ type: 'SET_MODAL', open: true });
       } else if (document.fullscreenElement) {
         fullscreenViolationLoggedRef.current = false;
-        setFullscreenModalOpen(false);
+        dispatch({ type: 'SET_MODAL', open: false });
       }
     };
 
+    const handlePopState = () => {
+      window.history.pushState(null, '', window.location.href);
+      reportViolation('back-navigation-attempt', 'Back navigation is blocked during the exam.');
+    };
+
+    window.history.pushState(null, '', window.location.href);
     document.addEventListener('visibilitychange', handleVisibility);
     document.addEventListener('contextmenu', handleContextMenu);
     document.addEventListener('dblclick', handleDoubleClick);
@@ -271,6 +475,7 @@ export default function ExamPage() {
     document.addEventListener('fullscreenchange', handleFullscreenExit);
     window.addEventListener('blur', handleBlur);
     window.addEventListener('beforeunload', handleBeforeUnload);
+    window.addEventListener('popstate', handlePopState);
 
     return () => {
       document.removeEventListener('visibilitychange', handleVisibility);
@@ -280,8 +485,35 @@ export default function ExamPage() {
       document.removeEventListener('fullscreenchange', handleFullscreenExit);
       window.removeEventListener('blur', handleBlur);
       window.removeEventListener('beforeunload', handleBeforeUnload);
+      window.removeEventListener('popstate', handlePopState);
     };
-  }, []);
+  }, [reportViolation, state.sessionId, state.studentId]);
+
+  useEffect(() => {
+    if (!state.fullscreenModalOpen) {
+      if (fullscreenModalTimerRef.current) {
+        window.clearInterval(fullscreenModalTimerRef.current);
+      }
+      dispatch({ type: 'SET_FULLSCREEN_COUNTDOWN', value: 8 });
+      return undefined;
+    }
+
+    fullscreenModalTimerRef.current = window.setInterval(() => {
+      dispatch({ type: 'SET_FULLSCREEN_COUNTDOWN', value: Math.max(0, state.fullscreenCountdown - 1) });
+    }, 1000);
+
+    return () => {
+      if (fullscreenModalTimerRef.current) {
+        window.clearInterval(fullscreenModalTimerRef.current);
+      }
+    };
+  }, [state.fullscreenCountdown, state.fullscreenModalOpen]);
+
+  useEffect(() => {
+    if (state.fullscreenModalOpen && state.fullscreenCountdown <= 0) {
+      handleAutoSubmit('fullscreen-exit');
+    }
+  }, [handleAutoSubmit, state.fullscreenCountdown, state.fullscreenModalOpen]);
 
   const requestFullscreenRecovery = async () => {
     try {
@@ -293,120 +525,99 @@ export default function ExamPage() {
     }
   };
 
-  const saveAnswer = async (answerOverride) => {
-    const sessionId = localStorage.getItem('studentSessionId');
-    const studentId = localStorage.getItem('studentId');
-    const question = questions[currentIndex];
-    const answer = answerOverride ?? answers[question.id] ?? '';
-    await api.post('/api/students/answer', {
-      sessionId,
-      studentId,
-      questionId: question.id,
-      answer,
-      currentQuestion: currentIndex
-    });
+  const canAdvance = Boolean(currentAnswer.selectedOption || currentAnswer.skipped);
+
+  const syncCurrentAnswer = async (nextIndex = state.currentIndex) => {
+    if (!currentQuestion) {
+      return;
+    }
+    const answerRecord = normalizeAnswerRecord(state.answers[currentQuestion.id]);
+    enqueue(() => submitRuntimeAnswer(currentQuestion.id, answerRecord, nextIndex));
   };
 
-  const handleSelect = async (option) => {
-    const question = questions[currentIndex];
-    setAnswers((prev) => ({ ...prev, [question.id]: option }));
-    try {
-      await saveAnswer(option);
-    } catch (err) {
-      pushWarning('Answer could not be synced immediately. It will retry on the next action.');
+  const handleSelect = (option) => {
+    if (!currentQuestion) {
+      return;
     }
+    dispatch({ type: 'SELECT_OPTION', questionId: currentQuestion.id, option });
+    enqueue(() => submitRuntimeAnswer(currentQuestion.id, {
+      selectedOption: option,
+      skipped: false,
+      timedOut: false
+    }, state.currentIndex));
   };
 
   const toggleSkip = (checked) => {
-    const question = questions[currentIndex];
-    setAnswers((prev) => ({
-      ...prev,
-      [question.id]: checked ? SKIPPED_TOKEN : ''
-    }));
-  };
-
-  const activeQuestion = questions[currentIndex];
-  const getCurrentResponse = () => (activeQuestion ? answers[activeQuestion.id] || '' : '');
-  const currentResponse = questions.length ? getCurrentResponse() : '';
-  const currentSkipped = currentResponse === SKIPPED_TOKEN;
-  const selectedOption = currentSkipped ? '' : currentResponse;
-
-  const advanceQuestion = async (responseValue, reasonMessage) => {
-    await saveAnswer(responseValue);
-    if (currentIndex < questions.length - 1) {
-      setCurrentIndex((prev) => prev + 1);
-      if (reasonMessage) {
-        pushWarning(reasonMessage);
-      }
-      timeoutTransitionRef.current = false;
+    if (!currentQuestion) {
       return;
     }
-    timeoutTransitionRef.current = false;
-    await handleAutoSubmit(reasonMessage === 'Current question timed out. It was marked as skipped.' ? 'timeout' : 'manual');
+    dispatch({ type: 'TOGGLE_SKIP', questionId: currentQuestion.id, checked });
+    enqueue(() => submitRuntimeAnswer(currentQuestion.id, {
+      selectedOption: '',
+      skipped: checked,
+      timedOut: false
+    }, state.currentIndex));
   };
 
   const handleNext = async () => {
-    if (!currentResponse) {
+    if (!canAdvance) {
       pushWarning('Answer the question or mark it as skipped before moving forward.');
       return;
     }
-    await advanceQuestion(currentResponse, currentSkipped ? 'Question skipped. Moved to the next question.' : '');
+    await syncCurrentAnswer(Math.min(state.currentIndex + 1, questions.length - 1));
+    dispatch({ type: 'ADVANCE' });
   };
 
   const handlePrev = () => {
-    if (currentIndex > 0) {
-      setCurrentIndex((prev) => prev - 1);
+    if (state.currentIndex > 0) {
+      dispatch({ type: 'SET_INDEX', index: state.currentIndex - 1 });
     }
   };
 
   const handleManualSubmit = async () => {
-    if (!currentResponse) {
+    if (!canAdvance) {
       pushWarning('Answer the question or mark it as skipped before submitting.');
       return;
     }
-    await saveAnswer(currentResponse);
-    await handleAutoSubmit(currentSkipped ? 'manual-skipped' : 'manual');
+    await syncCurrentAnswer(state.currentIndex);
+    await flushQueue();
+    await handleAutoSubmit(currentAnswer.skipped ? 'manual-skipped' : 'manual');
   };
 
-  const handleQuestionTimeout = async () => {
-    const timedOutResponse = currentResponse || SKIPPED_TOKEN;
-    if (!currentResponse) {
-      setAnswers((prev) => ({ ...prev, [question.id]: SKIPPED_TOKEN }));
+  const buttonTimerText = useMemo(() => {
+    const questionClock = state.settings.enableQuestionTimer ? formatClock(currentQuestionTime) : null;
+    const totalClock = state.settings.enableTotalTimer ? formatClock(state.totalRemaining) : null;
+    if (questionClock && totalClock) {
+      return `${questionClock} question · ${totalClock} left`;
     }
-    if (currentIndex < questions.length - 1) {
-      await advanceQuestion(timedOutResponse, 'Current question timed out. It was marked as skipped.');
-      return;
+    if (questionClock) {
+      return questionClock;
     }
-    await saveAnswer(timedOutResponse);
-    timeoutTransitionRef.current = false;
-    await handleAutoSubmit('timeout');
-  };
+    if (totalClock) {
+      return `${totalClock} left`;
+    }
+    return 'No timer';
+  }, [currentQuestionTime, state.settings.enableQuestionTimer, state.settings.enableTotalTimer, state.totalRemaining]);
 
-  if (!questions.length) {
+  if (!state.ready || !currentQuestion) {
     return (
       <main className="page-shell flex items-center justify-center">
-        <div className="card text-slate-500">Loading exam...</div>
+        <div className="card text-slate-500">Preparing exam...</div>
       </main>
     );
   }
 
-  const question = activeQuestion;
-  const currentQuestionTime = settings.mode === 'total' ? Number(timeLeft || 0) : getQuestionTime(question, settings);
-  const actionTimerLabel = settings.mode === 'total'
-    ? `Whole assessment time remaining: ${timeLeft ?? '...'}s`
-    : `Answer window for this question: ${timeLeft ?? currentQuestionTime}s`;
-
   return (
     <main className="page-shell surface-grid">
       <div className="page-wrap max-w-5xl">
-        <section className="space-y-6 fade-rise">
-          {fullscreenModalOpen && (
+        <section className="space-y-4 fade-rise">
+          {state.fullscreenModalOpen && (
             <div className="fixed inset-0 z-50 flex items-center justify-center bg-[rgba(17,33,61,0.7)] px-4">
               <div className="card-strong max-w-xl">
                 <div className="badge-orange">Fullscreen Warning</div>
-                <h2 className="section-title mt-4 text-2xl">You exited fullscreen.</h2>
+                <h2 className="section-title mt-3 text-xl">You exited fullscreen.</h2>
                 <p className="mt-3 text-sm text-slate-600">
-                  This has been marked as a violation. If you do not return to fullscreen within {fullscreenCountdown} seconds,
+                  This has been marked as a violation. If you do not return to fullscreen within {state.fullscreenCountdown} seconds,
                   your exam will be auto-submitted.
                 </p>
                 <div className="mt-6 flex flex-wrap gap-3">
@@ -418,19 +629,20 @@ export default function ExamPage() {
               </div>
             </div>
           )}
+
           <div className="card-strong">
             <div className="flex flex-wrap items-center justify-between gap-4">
               <div>
                 <div className="badge-blue">Focused Exam Mode</div>
-                <h1 className="section-title mt-3 text-3xl">Question {currentIndex + 1} of {questions.length}</h1>
-                <p className="mt-2 text-sm text-slate-600">
-                  Violations recorded: <span className="font-semibold text-slate-900">{violationCount}</span>
+                <h1 className="section-title mt-2 text-2xl">Question {state.currentIndex + 1} of {questions.length}</h1>
+                <p className="mt-1 text-xs text-slate-600">
+                  Violations recorded: <span className="font-semibold text-slate-900">{state.violationCount}</span>
                 </p>
-                {fullscreenModalOpen && (
-                  <p className="mt-2 text-sm font-semibold text-orange-700">Attempted fullscreen exit detected</p>
-                )}
               </div>
-              <Timer label="Time Left" value={timeLeft === null ? '...' : `${timeLeft}s`} />
+              <div className="flex flex-wrap gap-3">
+                {state.settings.enableQuestionTimer && <Timer label="Question" value={formatClock(currentQuestionTime)} />}
+                {state.settings.enableTotalTimer && <Timer label="Assessment" value={formatClock(state.totalRemaining)} />}
+              </div>
             </div>
           </div>
 
@@ -438,21 +650,21 @@ export default function ExamPage() {
             <div className="flex flex-wrap items-center justify-between gap-3">
               <p className="section-kicker">Current Prompt</p>
               <span className="badge-orange">
-                {settings.mode === 'total' ? 'Total timer running' : `${getQuestionTime(question, settings)}s for this question`}
+                {state.settings.enableQuestionTimer ? `${formatClock(currentQuestionTime)} for this question` : 'Per-question timer disabled'}
               </span>
             </div>
-            <div className="mt-4 text-2xl font-semibold text-slate-900">
-              <MathText text={question.question} />
+            <div className="mt-3 text-xl font-semibold text-slate-900">
+              <MathText text={currentQuestion.question} />
             </div>
-            {question.image && (
-              <img src={question.image} alt="Question" className="mt-5 max-h-72 rounded-[24px] border border-[rgba(17,33,61,0.08)] object-contain p-3" />
+            {currentQuestion.image && (
+              <img src={currentQuestion.image} alt="Question" className="mt-5 max-h-72 rounded-[24px] border border-[rgba(17,33,61,0.08)] object-contain p-3" />
             )}
             <div className="mt-6 grid gap-3 md:grid-cols-2">
-              {Object.entries(question.options).map(([key, value]) => (
+              {Object.entries(currentQuestion.options).map(([key, value]) => (
                 <button
                   key={key}
-                  className={`rounded-[24px] border px-5 py-4 text-left transition ${
-                    selectedOption === key
+                  className={`rounded-[20px] border px-4 py-3 text-left text-sm transition ${
+                    currentAnswer.selectedOption === key
                       ? 'border-[rgba(29,114,255,0.28)] bg-[rgba(29,114,255,0.12)] text-blue-900'
                       : 'border-[rgba(17,33,61,0.08)] bg-white/80 text-slate-700 hover:border-[rgba(255,138,42,0.24)] hover:bg-[rgba(255,138,42,0.08)]'
                   }`}
@@ -463,31 +675,31 @@ export default function ExamPage() {
                 </button>
               ))}
             </div>
-            <label className="mt-5 flex items-center gap-3 rounded-2xl border border-[rgba(255,138,42,0.14)] bg-[rgba(255,138,42,0.08)] px-4 py-3 text-sm text-slate-700">
-              <input type="checkbox" checked={currentSkipped} onChange={(event) => toggleSkip(event.target.checked)} />
+            <label className="mt-4 flex items-center gap-3 rounded-2xl border border-[rgba(255,138,42,0.14)] bg-[rgba(255,138,42,0.08)] px-4 py-3 text-sm text-slate-700">
+              <input type="checkbox" checked={currentAnswer.skipped} onChange={(event) => toggleSkip(event.target.checked)} />
               Skip this question
             </label>
           </div>
 
           <div className="space-y-3">
             <div className="rounded-2xl border border-[rgba(29,114,255,0.12)] bg-[rgba(29,114,255,0.06)] px-4 py-3 text-sm font-medium text-slate-700">
-              {actionTimerLabel}
+              Active timer: {buttonTimerText}
             </div>
             <div className="flex flex-wrap items-center justify-between gap-3">
-            <button className="btn-outline" onClick={handlePrev} disabled={currentIndex === 0}>Previous</button>
-            {currentIndex < questions.length - 1 ? (
-              <button className="btn-primary" onClick={handleNext}>
-                {currentSkipped ? 'Skip and Next' : 'Save and Next'}
-              </button>
-            ) : (
-              <button className="btn-accent" onClick={handleManualSubmit}>
-                {currentSkipped ? 'Submit with Skip' : 'Submit Exam'}
-              </button>
-            )}
-          </div>
+              <button className="btn-outline" onClick={handlePrev} disabled={state.currentIndex === 0}>Previous</button>
+              {state.currentIndex < questions.length - 1 ? (
+                <button className="btn-primary" onClick={handleNext}>
+                  {(currentAnswer.skipped ? 'Skip and Next' : 'Save and Next')} · {buttonTimerText}
+                </button>
+              ) : (
+                <button className="btn-accent" onClick={handleManualSubmit}>
+                  {(currentAnswer.skipped ? 'Submit with Skip' : 'Submit Exam')} · {buttonTimerText}
+                </button>
+              )}
+            </div>
           </div>
 
-          {message && <div className="glass-banner text-sm text-slate-700">{message}</div>}
+          {state.message && <div className="glass-banner text-sm text-slate-700">{state.message}</div>}
         </section>
       </div>
     </main>

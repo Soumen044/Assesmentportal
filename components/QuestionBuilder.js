@@ -103,14 +103,15 @@ export default function QuestionBuilder({
 
     try {
       if (mode === 'edit' && initialValues?.id) {
-        await api.put(`/api/assessments/${sessionId}/questions/${initialValues.id}`, payload);
+        const response = await api.put(`/api/assessments/${sessionId}/questions/${initialValues.id}`, payload);
         setMessage('Question updated.');
+        onAdded?.(response.data.questions || []);
       } else {
-        await api.post(`/api/assessments/${sessionId}/questions`, payload);
+        const response = await api.post(`/api/assessments/${sessionId}/questions`, payload);
         setForm(emptyForm);
         setMessage('Question added to the canvas.');
+        onAdded?.(response.data.questions || []);
       }
-      onAdded?.();
       if (mode === 'edit') {
         onCancel?.();
       }
@@ -124,8 +125,8 @@ export default function QuestionBuilder({
   const actionLabel = submitLabel || (mode === 'edit' ? 'Save Question' : 'Add Question');
 
   return (
-    <div className="space-y-5">
-      <div className="rounded-[24px] border border-[rgba(29,114,255,0.1)] bg-[rgba(29,114,255,0.04)] px-4 py-3 text-sm text-slate-600">
+    <div className="space-y-4">
+      <div className="rounded-[20px] border border-[rgba(29,114,255,0.1)] bg-[rgba(29,114,255,0.04)] px-4 py-3 text-sm text-slate-600">
         <p className="font-semibold text-slate-900">Math formula support</p>
         <p className="mt-2">
           Use LaTeX-style syntax inside <code>$...$</code> for inline math or <code>$$...$$</code> for block formulas.
@@ -167,7 +168,7 @@ export default function QuestionBuilder({
         </div>
       )}
 
-      <div className="rounded-[26px] border border-[rgba(255,138,42,0.12)] bg-white/90 p-5">
+      <div className="rounded-[22px] border border-[rgba(255,138,42,0.12)] bg-white/90 p-4">
         <p className="section-kicker">Live Preview</p>
         <div className="mt-4 space-y-3">
           <div>

@@ -8,7 +8,20 @@ import BulkQuestionTable from '../../../components/BulkQuestionTable';
 import MathText from '../../../components/MathText';
 import api from '../../../lib/api';
 
-const steps = ['Create Session', 'Question Canvas', 'Timing', 'Confirm'];
+const steps = ['Create Session', 'Question Canvas', 'Timing', 'Waiting Room', 'Launch Live'];
+
+function formatDateTime(value) {
+  if (!value) {
+    return '-';
+  }
+  return new Intl.DateTimeFormat('en-IN', {
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit'
+  }).format(new Date(value));
+}
 
 function formatSeconds(totalSeconds) {
   const seconds = Number(totalSeconds || 0);
@@ -20,20 +33,25 @@ function formatSeconds(totalSeconds) {
   if (!minutes) {
     return `${remainder}s`;
   }
-  if (!remainder) {
-    return `${minutes}m`;
-  }
-  return `${minutes}m ${remainder}s`;
+  return remainder ? `${minutes}m ${remainder}s` : `${minutes}m`;
 }
 
 function computePreviewDuration(questions, settings) {
   if (!questions.length) {
     return 0;
   }
-  if (settings.mode === 'total') {
-    return Number(settings.totalTime || 0);
-  }
-  return questions.reduce((sum, question) => sum + Number(question.customTime || settings.perQuestionTime || 0), 0);
+  return questions.reduce((sum, question) => sum + Number(question.customTime || settings.defaultQuestionTime || 0), 0);
+}
+
+function computeRuntimeSummary(questions, settings) {
+  const questionSum = computePreviewDuration(questions, settings);
+  const totalConfigured = Number(settings.totalTime || 0);
+  return {
+    questionSum,
+    totalConfigured,
+    minRuntime: settings.enableTotalTimer && settings.enableQuestionTimer ? Math.min(questionSum, totalConfigured || questionSum) : (settings.enableTotalTimer ? totalConfigured : questionSum),
+    maxRuntime: settings.enableTotalTimer && settings.enableQuestionTimer ? Math.max(questionSum, totalConfigured) : (settings.enableTotalTimer ? totalConfigured : questionSum)
+  };
 }
 
 export default function CreateAssessmentPage() {
@@ -41,49 +59,53 @@ export default function CreateAssessmentPage() {
   const [session, setSession] = useState({ name: '', sessionId: '', password: '', status: 'draft' });
   const [questions, setQuestions] = useState([]);
   const [settings, setSettings] = useState({
-    mode: 'per-question',
-    perQuestionTime: 60,
+    enableTotalTimer: false,
     totalTime: 0,
-    shuffle: false
+    enableQuestionTimer: true,
+    defaultQuestionTime: 60,
+    shuffleQuestions: false,
+    shuffleOptions: false,
+    violationThreshold: 3
   });
   const [message, setMessage] = useState('');
   const [loading, setLoading] = useState(false);
   const [draggedQuestionId, setDraggedQuestionId] = useState('');
   const [previewOpen, setPreviewOpen] = useState(true);
   const [editingQuestion, setEditingQuestion] = useState(null);
+  const [canvasTab, setCanvasTab] = useState('manual');
 
   const sessionReady = Boolean(session.sessionId && session.password);
   const sampleTemplateUrl = `${process.env.NEXT_PUBLIC_API_BASE_URL || ''}/api/assessments/sample-template`;
-
   const totalPreviewTime = useMemo(() => computePreviewDuration(questions, settings), [questions, settings]);
-
-  const refreshQuestions = async () => {
-    if (!session.sessionId) {
-      return;
-    }
-    const response = await api.get(`/api/assessments/${session.sessionId}/questions`);
-    setQuestions(response.data.questions || []);
-  };
-
-  const refreshAssessment = async () => {
-    if (!session.sessionId) {
-      return;
-    }
-    try {
-      const response = await api.get(`/api/assessments/${session.sessionId}/detail`);
-      setSession((prev) => ({ ...prev, ...response.data.assessment }));
-      setQuestions(response.data.questions || []);
-    } catch (err) {
-      setMessage(err.response?.data?.error || 'Unable to refresh assessment details');
-    }
-  };
+  const runtimeSummary = useMemo(() => computeRuntimeSummary(questions, settings), [questions, settings]);
 
   useEffect(() => {
     if (!sessionReady) {
       return;
     }
+
+    const refreshAssessment = async () => {
+      try {
+        const response = await api.get(`/api/assessments/${session.sessionId}/detail`);
+        const assessment = response.data.assessment || {};
+        setSession((prev) => ({ ...prev, ...assessment }));
+        if (assessment.settings) {
+          setSettings((prev) => ({ ...prev, ...assessment.settings }));
+        }
+        setQuestions(response.data.questions || []);
+        if (assessment.status === 'waiting_room') {
+          setStep((prev) => Math.max(prev, 4));
+        }
+        if (assessment.status === 'live') {
+          setStep(4);
+        }
+      } catch (err) {
+        setMessage(err.response?.data?.error || 'Unable to refresh assessment details');
+      }
+    };
+
     refreshAssessment();
-  }, [sessionReady]);
+  }, [session.sessionId, sessionReady]);
 
   const handleCreateSession = async () => {
     setLoading(true);
@@ -95,6 +117,7 @@ export default function CreateAssessmentPage() {
       });
       setSession((prev) => ({
         ...prev,
+        sessionId: response.data.sessionId,
         password: response.data.password,
         status: 'draft'
       }));
@@ -120,7 +143,9 @@ export default function CreateAssessmentPage() {
       await api.post(`/api/assessments/${session.sessionId}/questions/upload`, formData, {
         headers: { 'Content-Type': 'multipart/form-data' }
       });
-      await refreshQuestions();
+      const response = await api.get(`/api/assessments/${session.sessionId}/questions`);
+      setQuestions(response.data.questions || []);
+      setCanvasTab('preview');
       setMessage('Excel questions uploaded.');
     } catch (err) {
       setMessage(err.response?.data?.error || 'Upload failed');
@@ -134,8 +159,8 @@ export default function CreateAssessmentPage() {
     setLoading(true);
     setMessage('');
     try {
-      await api.delete(`/api/assessments/${session.sessionId}/questions/${questionId}`);
-      await refreshQuestions();
+      const response = await api.delete(`/api/assessments/${session.sessionId}/questions/${questionId}`);
+      setQuestions(response.data.questions || []);
       if (editingQuestion?.id === questionId) {
         setEditingQuestion(null);
       }
@@ -151,8 +176,9 @@ export default function CreateAssessmentPage() {
     setLoading(true);
     setMessage('');
     try {
-      await api.post(`/api/assessments/${session.sessionId}/questions/${questionId}/duplicate`);
-      await refreshQuestions();
+      const response = await api.post(`/api/assessments/${session.sessionId}/questions/${questionId}/duplicate`);
+      setQuestions(response.data.questions || []);
+      setCanvasTab('preview');
       setMessage('Question duplicated.');
     } catch (err) {
       setMessage(err.response?.data?.error || 'Unable to duplicate question');
@@ -165,9 +191,10 @@ export default function CreateAssessmentPage() {
     const previousQuestions = questions;
     setQuestions(orderedQuestions);
     try {
-      await api.put(`/api/assessments/${session.sessionId}/questions/reorder`, {
+      const response = await api.put(`/api/assessments/${session.sessionId}/questions/reorder`, {
         questionIds: orderedQuestions.map((question) => question.id)
       });
+      setQuestions(response.data.questions || orderedQuestions);
     } catch (err) {
       setQuestions(previousQuestions);
       throw err;
@@ -209,8 +236,9 @@ export default function CreateAssessmentPage() {
     setLoading(true);
     setMessage('');
     try {
-      await api.put(`/api/assessments/${session.sessionId}/settings`, settings);
-      setMessage('Timing configuration saved. Review the full preview before activating.');
+      const response = await api.put(`/api/assessments/${session.sessionId}/settings`, settings);
+      setSettings(response.data.settings || settings);
+      setMessage('Timing configuration saved. Review the full preview before opening the waiting room.');
       setStep(3);
     } catch (err) {
       setMessage(err.response?.data?.error || 'Failed to save settings');
@@ -219,16 +247,30 @@ export default function CreateAssessmentPage() {
     }
   };
 
-  const handleConfirm = async () => {
+  const handleOpenWaitingRoom = async () => {
     setLoading(true);
     setMessage('');
     try {
-      await api.post(`/api/assessments/${session.sessionId}/confirm`);
-      setSession((prev) => ({ ...prev, status: 'active' }));
-      setMessage(`Session activated. Share password ${session.password} with candidates.`);
-      await refreshAssessment();
+      const response = await api.post(`/api/assessments/${session.sessionId}/open-room`);
+      setSession((prev) => ({ ...prev, ...(response.data.assessment || {}), status: 'waiting_room' }));
+      setStep(4);
+      setMessage(`Waiting room opened. Students can now join with session password ${session.password}.`);
     } catch (err) {
-      setMessage(err.response?.data?.error || 'Confirmation failed');
+      setMessage(err.response?.data?.error || 'Unable to open the waiting room');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleLaunchLive = async () => {
+    setLoading(true);
+    setMessage('');
+    try {
+      const response = await api.post(`/api/assessments/${session.sessionId}/launch`);
+      setSession((prev) => ({ ...prev, ...(response.data.assessment || {}), status: 'live' }));
+      setMessage('Session launched. Waiting candidates can now enter the live exam.');
+    } catch (err) {
+      setMessage(err.response?.data?.error || 'Unable to launch the live exam');
     } finally {
       setLoading(false);
     }
@@ -248,45 +290,35 @@ export default function CreateAssessmentPage() {
         <AdminNav />
         <Stepper steps={steps} current={step} />
 
-        {message && <div className="glass-banner mb-6 fade-rise text-sm text-slate-700">{message}</div>}
+        {message && <div className="glass-banner mb-4 fade-rise text-sm text-slate-700">{message}</div>}
 
-        <div className="grid gap-6 lg:grid-cols-[0.72fr_1.28fr]">
-          <aside className="space-y-6">
+        <div className="grid gap-4 lg:grid-cols-[0.72fr_1.28fr]">
+          <aside className="compact-stack min-w-0">
             <div className="card-strong fade-rise">
-              <div className="flex items-center justify-between">
+              <div className="flex flex-wrap items-center justify-between gap-3">
                 <div className="badge-blue">Session Frame</div>
-                <span className={session.status === 'active' ? 'badge-orange' : 'badge-slate'}>
+                <span className={session.status === 'live' ? 'badge-orange' : session.status === 'waiting_room' ? 'badge-blue' : 'badge-slate'}>
                   {session.status || 'draft'}
                 </span>
               </div>
-              <div className="mt-4 space-y-4">
+              <div className="mt-4 compact-stack">
                 <div>
                   <label className="label">Assessment Name</label>
-                  <input
-                    className="input"
-                    value={session.name}
-                    onChange={(event) => setSession((prev) => ({ ...prev, name: event.target.value }))}
-                    disabled={sessionReady}
-                  />
+                  <input className="input" value={session.name} onChange={(event) => setSession((prev) => ({ ...prev, name: event.target.value }))} disabled={sessionReady} />
                 </div>
                 <div>
                   <label className="label">Session ID</label>
-                  <input
-                    className="input"
-                    value={session.sessionId}
-                    onChange={(event) => setSession((prev) => ({ ...prev, sessionId: event.target.value }))}
-                    disabled={sessionReady}
-                  />
+                  <input className="input" value={session.sessionId} onChange={(event) => setSession((prev) => ({ ...prev, sessionId: event.target.value }))} disabled={sessionReady} />
                 </div>
                 {!sessionReady ? (
                   <button className="btn-primary w-full" onClick={handleCreateSession} disabled={loading || !session.name || !session.sessionId}>
                     {loading ? 'Creating session...' : 'Create Session First'}
                   </button>
                 ) : (
-                  <div className="rounded-[24px] border border-[rgba(255,138,42,0.16)] bg-[rgba(255,138,42,0.08)] p-4">
+                  <div className="rounded-[20px] border border-[rgba(255,138,42,0.16)] bg-[rgba(255,138,42,0.08)] p-3">
                     <p className="section-kicker">Generated Password</p>
-                    <p className="mt-2 text-3xl font-semibold tracking-[0.2em] text-slate-900">{session.password}</p>
-                    <button className="btn-accent mt-4" onClick={handleCopyPassword}>Copy Password</button>
+                    <p className="mt-2 break-all text-2xl font-semibold tracking-[0.16em] text-slate-900">{session.password}</p>
+                    <button className="btn-accent mt-3" onClick={handleCopyPassword}>Copy Password</button>
                   </div>
                 )}
               </div>
@@ -294,33 +326,37 @@ export default function CreateAssessmentPage() {
 
             <div className="card fade-rise">
               <p className="section-kicker">Session Snapshot</p>
-              <div className="mt-4 grid gap-3">
+              <div className="mt-3 grid gap-2">
                 <div className="stat-card">
-                  <p className="text-xs uppercase tracking-[0.2em] text-slate-400">Question Count</p>
-                  <p className="mt-2 text-2xl font-semibold">{questions.length}</p>
+                  <p className="section-kicker">Question Count</p>
+                  <p className="mt-2 text-xl font-semibold">{questions.length}</p>
                 </div>
                 <div className="stat-card">
-                  <p className="text-xs uppercase tracking-[0.2em] text-slate-400">Timing Guide</p>
-                  <p className="mt-2 text-lg font-semibold">{formatSeconds(totalPreviewTime)}</p>
+                  <p className="section-kicker">Timing Guide</p>
+                  <p className="mt-2 text-sm font-semibold">{formatSeconds(totalPreviewTime)}</p>
                 </div>
                 <div className="stat-card">
-                  <p className="text-xs uppercase tracking-[0.2em] text-slate-400">Shuffle</p>
-                  <p className="mt-2 text-lg font-semibold">{settings.shuffle ? 'Enabled' : 'Disabled'}</p>
+                  <p className="section-kicker">Shuffle</p>
+                  <p className="mt-2 text-sm font-semibold">{settings.shuffleQuestions ? 'Questions shuffled' : 'Ordered sequence'}</p>
                 </div>
                 <div className="stat-card">
-                  <p className="text-xs uppercase tracking-[0.2em] text-slate-400">Created By</p>
-                  <p className="mt-2 text-lg font-semibold">{session.createdBy || 'Current admin'}</p>
+                  <p className="section-kicker">Session Date</p>
+                  <p className="mt-2 text-xs font-semibold">{formatDateTime(session.createdAt)}</p>
+                </div>
+                <div className="stat-card">
+                  <p className="section-kicker">Created By</p>
+                  <p className="mt-2 text-sm font-semibold">{session.createdBy || 'Current admin'}</p>
                 </div>
               </div>
             </div>
           </aside>
 
-          <section className="space-y-6">
+          <section className="compact-stack min-w-0">
             {step === 0 && (
               <div className="card-strong fade-rise">
                 <div className="space-y-3">
                   <div className="badge-orange">Step 1</div>
-                  <h1 className="hero-title text-3xl">Start with the session shell.</h1>
+                  <h1 className="hero-title text-2xl">Start with the session shell.</h1>
                   <p className="hero-subtitle">
                     Create the session first. Only after the password is generated will question upload, question design, and timing controls unlock.
                   </p>
@@ -329,274 +365,315 @@ export default function CreateAssessmentPage() {
             )}
 
             {step === 1 && (
-              <div className="space-y-6 fade-rise">
+              <div className="compact-stack fade-rise">
                 <div className="card-strong">
                   <div className="flex flex-wrap items-start justify-between gap-4">
                     <div>
                       <div className="badge-blue">Step 2</div>
-                      <h2 className="section-title mt-3">Question Canvas</h2>
+                      <h2 className="section-title mt-2">Question Canvas</h2>
                       <p className="mt-2 text-sm text-slate-600">
-                        Upload Excel, download a clean sample template, or build manually. Drag and drop cards to reorder the exam flow.
+                        Switch between upload, manual builder, preview, and bulk edit without showing every section at once.
                       </p>
                     </div>
-                    <a
-                      className="btn-outline"
-                      href={sampleTemplateUrl}
-                      target="_blank"
-                      rel="noreferrer"
-                    >
-                      Download Sample .xlsx
-                    </a>
+                    <a className="btn-outline" href={sampleTemplateUrl} target="_blank" rel="noreferrer">Download Sample .xlsx</a>
                   </div>
-                  <div className="mt-6 grid gap-6 xl:grid-cols-[0.95fr_1.05fr]">
-                    <div className="space-y-6">
-                      <div>
-                        <label className="label">Upload Question Sheet</label>
-                        <input className="input" type="file" accept=".xlsx,.xls" onChange={handleUpload} disabled={!sessionReady || loading} />
+
+                  <div className="mt-4 panel-tabs">
+                    {[
+                      ['manual', editingQuestion ? 'Edit Builder' : 'Manual Builder'],
+                      ['preview', `Question Preview (${questions.length})`],
+                      ['bulk', 'Bulk Edit']
+                    ].map(([key, label]) => (
+                      <button key={key} className={`tab-chip ${canvasTab === key ? 'tab-chip-active' : ''}`} onClick={() => setCanvasTab(key)}>
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+
+                  {canvasTab === 'manual' && (
+                    <div className="mt-4 grid gap-4 xl:grid-cols-[0.9fr_1.1fr]">
+                      <div className="compact-stack">
+                        <div className="table-shell p-3">
+                          <label className="label">Upload Question Sheet</label>
+                          <input className="input" type="file" accept=".xlsx,.xls" onChange={handleUpload} disabled={!sessionReady || loading} />
+                        </div>
+                        <div className="table-shell p-3">
+                          <p className="section-kicker">Manual Builder</p>
+                          <div className="mt-3">
+                            <QuestionBuilder
+                              sessionId={session.sessionId}
+                              onAdded={(nextQuestions) => {
+                                if (nextQuestions.length) {
+                                  setQuestions(nextQuestions);
+                                  setCanvasTab('preview');
+                                }
+                              }}
+                              mode={editingQuestion ? 'edit' : 'create'}
+                              initialValues={editingQuestion}
+                              onCancel={() => setEditingQuestion(null)}
+                              submitLabel={editingQuestion ? 'Save Canvas Changes' : 'Add Question'}
+                            />
+                          </div>
+                        </div>
                       </div>
-                      <div>
-                        <p className="section-kicker">Manual Builder</p>
-                        <div className="mt-3 rounded-[28px] border border-[rgba(29,114,255,0.1)] bg-white/80 p-4">
-                          <QuestionBuilder
-                            sessionId={session.sessionId}
-                            onAdded={refreshQuestions}
-                            mode={editingQuestion ? 'edit' : 'create'}
-                            initialValues={editingQuestion}
-                            onCancel={() => setEditingQuestion(null)}
-                            submitLabel={editingQuestion ? 'Save Canvas Changes' : 'Add Question'}
-                          />
+                      <div className="table-shell p-3">
+                        <div className="flex flex-wrap items-center justify-between gap-3">
+                          <p className="section-kicker">Builder Notes</p>
+                          <span className="badge-blue">{questions.length} ready</span>
+                        </div>
+                        <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                          <div className="stat-card">
+                            <p className="section-kicker">Fast CRUD</p>
+                            <p className="mt-2 text-compact text-slate-600">Question add, update, duplicate, and delete now reuse the returned payload instead of refetching the whole screen.</p>
+                          </div>
+                          <div className="stat-card">
+                            <p className="section-kicker">Compact Containers</p>
+                            <p className="mt-2 text-compact text-slate-600">Long prompts and options wrap inside cards, keeping text inside each border.</p>
+                          </div>
                         </div>
                       </div>
                     </div>
+                  )}
 
-                    <div>
-                      <div className="flex flex-wrap items-center justify-between gap-3">
-                        <p className="section-kicker">Drag-and-Drop Order</p>
-                        <span className="text-xs text-slate-500">
-                          Edit, duplicate, delete, and reorder questions before publishing.
-                        </span>
-                      </div>
-                      <div className="mt-3 space-y-3">
-                        {!questions.length && (
-                          <div className="card text-sm text-slate-500">No questions yet. Create or upload at least one question to continue.</div>
-                        )}
-                        {questions.map((question, index) => (
-                          <div
-                            key={question.id}
-                            className="card cursor-move"
-                            draggable
-                            onDragStart={() => setDraggedQuestionId(question.id)}
-                            onDragOver={(event) => event.preventDefault()}
-                            onDrop={() => handleDropQuestion(question.id)}
-                          >
-                            <div className="flex flex-wrap items-center justify-between gap-3">
-                              <div>
-                                <p className="font-semibold text-slate-900">Q{index + 1}.</p>
-                                <div className="mt-1 text-slate-800">
-                                  <MathText text={question.question} />
-                                </div>
-                                <p className="mt-1 text-sm text-slate-500">
-                                  Time: {question.customTime ? `${question.customTime}s dedicated` : `${settings.perQuestionTime || 60}s default`}
-                                </p>
+                  {canvasTab === 'preview' && (
+                    <div className="mt-4 compact-stack">
+                      {!questions.length && <div className="table-shell p-3 text-sm text-slate-500">No questions yet. Create or upload at least one question to continue.</div>}
+                      {questions.map((question, index) => (
+                        <div
+                          key={question.id}
+                          className="card cursor-move"
+                          draggable
+                          onDragStart={() => setDraggedQuestionId(question.id)}
+                          onDragOver={(event) => event.preventDefault()}
+                          onDrop={() => handleDropQuestion(question.id)}
+                        >
+                          <div className="flex flex-wrap items-center justify-between gap-3">
+                            <div className="min-w-0">
+                              <p className="font-semibold text-slate-900">Q{index + 1}.</p>
+                              <div className="mt-1 content-safe text-sm text-slate-800">
+                                <MathText text={question.question} />
                               </div>
-                              <div className="flex flex-wrap gap-2">
-                                <button className="btn-ghost" onClick={() => setEditingQuestion(question)}>Edit</button>
-                                <button className="btn-ghost" onClick={() => handleDuplicateQuestion(question.id)} disabled={loading}>Duplicate</button>
-                                <button className="btn-ghost" onClick={() => handleDeleteQuestion(question.id)} disabled={loading}>Delete</button>
-                                <button className="btn-ghost" onClick={() => moveQuestion(index, -1)} disabled={index === 0}>Up</button>
-                                <button className="btn-ghost" onClick={() => moveQuestion(index, 1)} disabled={index === questions.length - 1}>Down</button>
-                              </div>
+                              <p className="mt-1 text-xs text-slate-500">
+                                Time: {question.customTime ? `${question.customTime}s dedicated` : `${settings.defaultQuestionTime || 60}s default`}
+                              </p>
                             </div>
-                            <div className="mt-4 grid gap-2 md:grid-cols-2">
-                              {Object.entries(question.options || {}).map(([key, value]) => (
-                                <div key={key} className={`rounded-2xl px-4 py-3 text-sm ${question.answer === key ? 'bg-[rgba(29,114,255,0.08)] text-blue-900' : 'bg-slate-50 text-slate-600'}`}>
-                                  <span className="font-semibold">{key}.</span>{' '}
-                                  <MathText text={value} />
-                                </div>
-                              ))}
+                            <div className="flex flex-wrap gap-2">
+                              <button className="btn-ghost" onClick={() => {
+                                setEditingQuestion(question);
+                                setCanvasTab('manual');
+                              }}>Edit</button>
+                              <button className="btn-ghost" onClick={() => handleDuplicateQuestion(question.id)} disabled={loading}>Duplicate</button>
+                              <button className="btn-ghost" onClick={() => handleDeleteQuestion(question.id)} disabled={loading}>Delete</button>
+                              <button className="btn-ghost" onClick={() => moveQuestion(index, -1)} disabled={index === 0}>Up</button>
+                              <button className="btn-ghost" onClick={() => moveQuestion(index, 1)} disabled={index === questions.length - 1}>Down</button>
                             </div>
                           </div>
-                        ))}
-                      </div>
+                          <div className="mt-3 grid gap-2 md:grid-cols-2">
+                            {Object.entries(question.options || {}).map(([key, value]) => (
+                              <div key={key} className={`rounded-2xl px-3 py-2 text-xs ${question.answer === key ? 'bg-[rgba(29,114,255,0.08)] text-blue-900' : 'bg-slate-50 text-slate-600'}`}>
+                                <span className="font-semibold">{key}.</span>{' '}
+                                <MathText text={value} />
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      ))}
                     </div>
-                  </div>
+                  )}
+
+                  {canvasTab === 'bulk' && (
+                    <div className="mt-4">
+                      {questions.length > 0 ? (
+                        <BulkQuestionTable
+                          sessionId={session.sessionId}
+                          questions={questions}
+                          onSaved={(nextQuestions) => setQuestions(nextQuestions)}
+                          onDelete={handleDeleteQuestion}
+                          onDuplicate={handleDuplicateQuestion}
+                          onEdit={(question) => {
+                            setEditingQuestion(question);
+                            setCanvasTab('manual');
+                          }}
+                        />
+                      ) : (
+                        <div className="table-shell p-3 text-sm text-slate-500">Bulk edit unlocks after at least one question exists.</div>
+                      )}
+                    </div>
+                  )}
                 </div>
                 <div className="flex justify-end">
                   <button className="btn-primary" onClick={() => setStep(2)} disabled={!questions.length}>Next: Timing Settings</button>
                 </div>
-                {questions.length > 0 && (
-                  <BulkQuestionTable
-                    sessionId={session.sessionId}
-                    questions={questions}
-                    onSaved={refreshQuestions}
-                    onDelete={handleDeleteQuestion}
-                    onDuplicate={handleDuplicateQuestion}
-                    onEdit={setEditingQuestion}
-                  />
-                )}
               </div>
             )}
 
             {step === 2 && (
               <div className="card-strong fade-rise">
                 <div className="badge-orange">Step 3</div>
-                <h2 className="section-title mt-3">Timing and behavior settings</h2>
-                <p className="mt-2 text-sm text-slate-600">
-                  Define the whole-assessment clock or the default per-question timer. Dedicated question timers always override the default and are shown below.
-                </p>
+                <h2 className="section-title mt-2">Timing and behavior settings</h2>
+                <p className="mt-2 text-sm text-slate-600">Keep timer controls compact while still exposing the full timing map.</p>
 
-                <div className="mt-6 grid gap-4 md:grid-cols-3">
+                <div className="mt-4 grid gap-3 md:grid-cols-3">
                   <div className="stat-card">
                     <p className="section-kicker">Question Count</p>
-                    <p className="mt-2 text-2xl font-semibold">{questions.length}</p>
+                    <p className="mt-2 text-xl font-semibold">{questions.length}</p>
                   </div>
                   <div className="stat-card">
-                    <p className="section-kicker">Current Timing Mode</p>
-                    <p className="mt-2 text-lg font-semibold">{settings.mode === 'total' ? 'Whole Assessment' : 'Per Question'}</p>
+                    <p className="section-kicker">Total Timer</p>
+                    <p className="mt-2 text-sm font-semibold">{settings.enableTotalTimer ? formatSeconds(settings.totalTime) : 'Disabled'}</p>
                   </div>
                   <div className="stat-card">
-                    <p className="section-kicker">Projected Total Time</p>
-                    <p className="mt-2 text-lg font-semibold">{formatSeconds(totalPreviewTime)}</p>
+                    <p className="section-kicker">Question Timer</p>
+                    <p className="mt-2 text-sm font-semibold">{settings.enableQuestionTimer ? formatSeconds(settings.defaultQuestionTime) : 'Disabled'}</p>
                   </div>
                 </div>
 
-                <div className="mt-6 grid gap-4 md:grid-cols-2">
+                <div className="mt-3 grid gap-3 md:grid-cols-3">
+                  <div className="stat-card">
+                    <p className="section-kicker">Question Sum</p>
+                    <p className="mt-2 text-sm font-semibold">{formatSeconds(runtimeSummary.questionSum)}</p>
+                  </div>
+                  <div className="stat-card">
+                    <p className="section-kicker">Minimum Runtime</p>
+                    <p className="mt-2 text-sm font-semibold">{formatSeconds(runtimeSummary.minRuntime)}</p>
+                  </div>
+                  <div className="stat-card">
+                    <p className="section-kicker">Maximum Runtime</p>
+                    <p className="mt-2 text-sm font-semibold">{formatSeconds(runtimeSummary.maxRuntime)}</p>
+                  </div>
+                </div>
+
+                <div className="mt-4 grid gap-3 md:grid-cols-2">
+                  <div className="table-shell p-3">
+                    <label className="label">Whole Assessment Timer</label>
+                    <label className="mt-2 flex items-center gap-3 rounded-2xl border border-[rgba(29,114,255,0.14)] bg-[rgba(29,114,255,0.06)] px-4 py-3 text-sm text-slate-600">
+                      <input type="checkbox" checked={settings.enableTotalTimer} onChange={(event) => setSettings((prev) => ({ ...prev, enableTotalTimer: event.target.checked }))} />
+                      Enforce an overall countdown
+                    </label>
+                    <input className="input mt-3" type="number" min="30" value={settings.totalTime} onChange={(event) => setSettings((prev) => ({ ...prev, totalTime: event.target.value }))} disabled={!settings.enableTotalTimer} />
+                  </div>
+                  <div className="table-shell p-3">
+                    <label className="label">Per-Question Timer</label>
+                    <label className="mt-2 flex items-center gap-3 rounded-2xl border border-[rgba(255,138,42,0.14)] bg-[rgba(255,138,42,0.08)] px-4 py-3 text-sm text-slate-600">
+                      <input type="checkbox" checked={settings.enableQuestionTimer} onChange={(event) => setSettings((prev) => ({ ...prev, enableQuestionTimer: event.target.checked }))} />
+                      Auto-skip each question on timeout
+                    </label>
+                    <input className="input mt-3" type="number" min="10" value={settings.defaultQuestionTime} onChange={(event) => setSettings((prev) => ({ ...prev, defaultQuestionTime: event.target.value }))} disabled={!settings.enableQuestionTimer} />
+                  </div>
+                </div>
+
+                <div className="mt-3 grid gap-3 md:grid-cols-2">
+                  <label className="flex items-center gap-3 rounded-2xl border border-[rgba(255,138,42,0.14)] bg-[rgba(255,138,42,0.08)] px-4 py-3 text-sm text-slate-600">
+                    <input type="checkbox" checked={settings.shuffleQuestions} onChange={(event) => setSettings((prev) => ({ ...prev, shuffleQuestions: event.target.checked }))} />
+                    Shuffle question order once at start
+                  </label>
+                  <label className="flex items-center gap-3 rounded-2xl border border-[rgba(29,114,255,0.14)] bg-[rgba(29,114,255,0.06)] px-4 py-3 text-sm text-slate-600">
+                    <input type="checkbox" checked={settings.shuffleOptions} onChange={(event) => setSettings((prev) => ({ ...prev, shuffleOptions: event.target.checked }))} />
+                    Shuffle answer options once at start
+                  </label>
+                </div>
+
+                <div className="mt-3 grid gap-3 md:grid-cols-2">
                   <div>
-                    <label className="label">Timer Mode</label>
-                    <select className="input" value={settings.mode} onChange={(event) => setSettings((prev) => ({ ...prev, mode: event.target.value }))}>
-                      <option value="per-question">Per question</option>
-                      <option value="total">Total exam time</option>
-                    </select>
+                    <label className="label">Violation Threshold</label>
+                    <input className="input" type="number" min="1" max="10" value={settings.violationThreshold} onChange={(event) => setSettings((prev) => ({ ...prev, violationThreshold: event.target.value }))} />
                   </div>
-                  {settings.mode === 'per-question' ? (
-                    <div>
-                      <label className="label">Default Seconds Per Question</label>
-                      <input className="input" type="number" min="10" value={settings.perQuestionTime} onChange={(event) => setSettings((prev) => ({ ...prev, perQuestionTime: event.target.value }))} />
-                    </div>
-                  ) : (
-                    <div>
-                      <label className="label">Total Exam Time in Seconds</label>
-                      <input className="input" type="number" min="30" value={settings.totalTime} onChange={(event) => setSettings((prev) => ({ ...prev, totalTime: event.target.value }))} />
-                    </div>
-                  )}
+                  <div className="stat-card">
+                    <p className="section-kicker">Strict Runtime</p>
+                    <p className="mt-2 text-compact text-slate-600">Students must answer or explicitly skip each question before moving forward.</p>
+                  </div>
                 </div>
 
-                <label className="mt-5 flex items-center gap-3 rounded-2xl border border-[rgba(255,138,42,0.14)] bg-[rgba(255,138,42,0.08)] px-4 py-3 text-sm text-slate-600">
-                  <input type="checkbox" checked={settings.shuffle} onChange={(event) => setSettings((prev) => ({ ...prev, shuffle: event.target.checked }))} />
-                  Shuffle questions when the exam starts
-                </label>
-
-                <div className="mt-6 rounded-[28px] border border-[rgba(17,33,61,0.08)] bg-white/80 p-5">
-                  <div className="flex flex-wrap items-center justify-between gap-3">
-                    <div>
-                      <p className="section-kicker">Question Timing Map</p>
-                      <h3 className="mt-2 text-xl font-semibold text-slate-900">Focused timing control</h3>
-                    </div>
-                    <span className="badge-blue">
-                      {settings.mode === 'total' ? 'Assessment timer active' : 'Per-question timer active'}
-                    </span>
-                  </div>
-                  <div className="mt-4 overflow-x-auto">
-                    <table className="min-w-full text-sm">
-                      <thead>
-                        <tr className="border-b border-[rgba(17,33,61,0.08)] text-left text-slate-500">
-                          <th className="px-3 py-3 font-medium">Q</th>
-                          <th className="px-3 py-3 font-medium">Prompt</th>
-                          <th className="px-3 py-3 font-medium">Timer Applied</th>
-                          <th className="px-3 py-3 font-medium">Source</th>
+                <div className="mt-4 table-shell compact-scroll">
+                  <table className="min-w-full text-xs">
+                    <thead>
+                      <tr className="border-b border-[rgba(17,33,61,0.08)] text-left text-slate-500">
+                        <th className="px-3 py-2 font-medium">Q</th>
+                        <th className="px-3 py-2 font-medium">Prompt</th>
+                        <th className="px-3 py-2 font-medium">Timer</th>
+                        <th className="px-3 py-2 font-medium">Source</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {questions.map((question, index) => (
+                        <tr key={question.id} className="border-b border-[rgba(17,33,61,0.06)] align-top">
+                          <td className="px-3 py-2 font-semibold text-slate-900">{index + 1}</td>
+                          <td className="px-3 py-2 text-slate-700"><MathText text={question.question} /></td>
+                          <td className="px-3 py-2 font-medium text-slate-900">
+                            {settings.enableQuestionTimer ? formatSeconds(question.customTime || settings.defaultQuestionTime) : 'No per-question timer'}
+                          </td>
+                          <td className="px-3 py-2 text-slate-600">
+                            {question.customTime ? 'Dedicated question timer' : settings.enableQuestionTimer ? 'Default question timer' : settings.enableTotalTimer ? 'Assessment timer only' : 'No timer'}
+                          </td>
                         </tr>
-                      </thead>
-                      <tbody>
-                        {questions.map((question, index) => (
-                          <tr key={question.id} className="border-b border-[rgba(17,33,61,0.06)] align-top">
-                            <td className="px-3 py-3 font-semibold text-slate-900">{index + 1}</td>
-                            <td className="px-3 py-3 text-slate-700">
-                              <MathText text={question.question} />
-                            </td>
-                            <td className="px-3 py-3 font-medium text-slate-900">
-                              {settings.mode === 'total'
-                                ? formatSeconds(settings.totalTime)
-                                : formatSeconds(question.customTime || settings.perQuestionTime)}
-                            </td>
-                            <td className="px-3 py-3 text-slate-600">
-                              {settings.mode === 'total'
-                                ? 'Whole assessment timer'
-                                : question.customTime
-                                  ? 'Dedicated question timer'
-                                  : 'Default question timer'}
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
+                      ))}
+                    </tbody>
+                  </table>
                 </div>
 
-                <div className="mt-6 flex gap-3">
+                <div className="mt-4 flex gap-3">
                   <button className="btn-outline" onClick={() => setStep(1)}>Back to Canvas</button>
                   <button className="btn-primary" onClick={handleSettingsSave} disabled={loading}>Save and Preview</button>
                 </div>
               </div>
             )}
 
-            {step === 3 && (
-              <div className="space-y-6 fade-rise">
+            {step >= 3 && (
+              <div className="compact-stack fade-rise">
                 <div className="card-strong">
                   <div className="flex flex-wrap items-start justify-between gap-4">
                     <div>
-                      <div className="badge-blue">Step 4</div>
-                      <h2 className="section-title mt-3">Preview and confirm the assessment</h2>
-                      <p className="mt-2 text-sm text-slate-600">
-                        Review the question flow, dedicated timings, exam duration, and generated password before activation.
-                      </p>
+                      <div className="badge-blue">{step === 3 ? 'Step 4' : 'Step 5'}</div>
+                      <h2 className="section-title mt-2">{step === 3 ? 'Preview and open the waiting room' : 'Launch the live exam'}</h2>
+                      <p className="mt-2 text-sm text-slate-600">Keep launch controls visible while preview details stay collapsible.</p>
                     </div>
                     <button className="btn-outline" onClick={() => setPreviewOpen((open) => !open)}>
                       {previewOpen ? 'Hide Preview' : 'Preview Assessment'}
                     </button>
                   </div>
 
-                  <div className="mt-6 grid gap-4 md:grid-cols-4">
+                  <div className="mt-4 grid gap-3 md:grid-cols-5">
                     <div className="stat-card">
                       <p className="section-kicker">Session ID</p>
-                      <p className="mt-2 text-lg font-semibold">{session.sessionId}</p>
+                      <p className="mt-2 text-sm font-semibold">{session.sessionId}</p>
                     </div>
                     <div className="stat-card">
                       <p className="section-kicker">Password</p>
-                      <p className="mt-2 text-lg font-semibold tracking-[0.2em]">{session.password}</p>
+                      <p className="mt-2 break-all text-sm font-semibold tracking-[0.14em]">{session.password}</p>
                     </div>
                     <div className="stat-card">
                       <p className="section-kicker">Questions</p>
-                      <p className="mt-2 text-lg font-semibold">{questions.length}</p>
+                      <p className="mt-2 text-sm font-semibold">{questions.length}</p>
                     </div>
                     <div className="stat-card">
-                      <p className="section-kicker">Timeline</p>
-                      <p className="mt-2 text-lg font-semibold">{formatSeconds(totalPreviewTime)}</p>
+                      <p className="section-kicker">Runtime Window</p>
+                      <p className="mt-2 text-xs font-semibold">{formatSeconds(runtimeSummary.minRuntime)} - {formatSeconds(runtimeSummary.maxRuntime)}</p>
+                    </div>
+                    <div className="stat-card">
+                      <p className="section-kicker">Created</p>
+                      <p className="mt-2 text-xs font-semibold">{formatDateTime(session.createdAt)}</p>
                     </div>
                   </div>
 
                   {previewOpen && (
-                    <div className="mt-6 space-y-3">
+                    <div className="mt-4 compact-stack">
                       {questions.map((question, index) => (
                         <div key={question.id} className="card">
                           <div className="flex flex-wrap items-center justify-between gap-3">
-                            <div>
+                            <div className="min-w-0">
                               <p className="font-semibold text-slate-900">Q{index + 1}.</p>
-                              <div className="mt-1 text-slate-800">
+                              <div className="mt-1 content-safe text-sm text-slate-800">
                                 <MathText text={question.question} />
                               </div>
-                              <p className="mt-1 text-sm text-slate-500">
-                                Time guideline: {settings.mode === 'total'
-                                  ? 'Uses total exam timer'
-                                  : question.customTime
-                                    ? `${question.customTime}s dedicated`
-                                    : `${settings.perQuestionTime}s default`}
+                              <p className="mt-1 text-xs text-slate-500">
+                                Time guideline: {question.customTime ? `${question.customTime}s dedicated` : settings.enableQuestionTimer ? `${settings.defaultQuestionTime}s default` : settings.enableTotalTimer ? 'Uses total exam timer only' : 'No timer configured'}
                               </p>
                             </div>
                             <span className="badge-slate">Answer {question.answer}</span>
                           </div>
-                          <div className="mt-4 grid gap-2 md:grid-cols-2">
+                          <div className="mt-3 grid gap-2 md:grid-cols-2">
                             {Object.entries(question.options || {}).map(([key, value]) => (
-                              <div key={key} className="rounded-2xl bg-slate-50 px-4 py-3 text-sm text-slate-600">
+                              <div key={key} className="rounded-2xl bg-slate-50 px-3 py-2 text-xs text-slate-600">
                                 <span className="font-semibold text-slate-900">{key}.</span>{' '}
                                 <MathText text={value} />
                               </div>
@@ -607,12 +684,22 @@ export default function CreateAssessmentPage() {
                     </div>
                   )}
 
-                  <div className="mt-6 flex gap-3">
+                  <div className="mt-4 flex gap-3">
                     <button className="btn-outline" onClick={() => setStep(2)}>Back to Settings</button>
-                    <button className="btn-accent" onClick={handleConfirm} disabled={loading || !questions.length}>
-                      {loading ? 'Activating...' : 'Confirm Session'}
+                    <button className="btn-accent" onClick={handleOpenWaitingRoom} disabled={loading || !questions.length || session.status === 'waiting_room' || session.status === 'live'}>
+                      {loading ? 'Opening...' : 'Open Waiting Room'}
                     </button>
+                    {(session.status === 'waiting_room' || step === 4) && (
+                      <button className="btn-primary" onClick={handleLaunchLive} disabled={loading || session.status === 'live'}>
+                        {loading ? 'Launching...' : 'Launch Live Exam'}
+                      </button>
+                    )}
                   </div>
+                  {(session.status === 'waiting_room' || session.status === 'live') && (
+                    <div className="mt-3 rounded-[20px] border border-[rgba(29,114,255,0.14)] bg-[rgba(29,114,255,0.06)] px-4 py-3 text-sm text-slate-700">
+                      Session status: <span className="font-semibold text-slate-900">{session.status}</span>. Students may wait in the lobby after the room is opened, and only begin once you launch the live exam.
+                    </div>
+                  )}
                 </div>
               </div>
             )}

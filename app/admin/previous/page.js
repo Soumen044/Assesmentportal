@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Bar } from 'react-chartjs-2';
 import {
   Chart as ChartJS,
@@ -17,6 +17,27 @@ import MathText from '../../../components/MathText';
 
 ChartJS.register(CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend);
 
+function formatViolationSummary(summary = {}) {
+  const entries = Object.entries(summary);
+  if (!entries.length) {
+    return 'None';
+  }
+  return entries.map(([type, count]) => `${type} (${count})`).join(', ');
+}
+
+function formatDateTime(value) {
+  if (!value) {
+    return '-';
+  }
+  return new Intl.DateTimeFormat('en-IN', {
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit'
+  }).format(new Date(value));
+}
+
 export default function PreviousPage() {
   const [assessments, setAssessments] = useState([]);
   const [selected, setSelected] = useState(null);
@@ -26,43 +47,40 @@ export default function PreviousPage() {
   const [message, setMessage] = useState('');
   const [downloadingId, setDownloadingId] = useState('');
   const [downloadingPdfId, setDownloadingPdfId] = useState('');
-
-  const formatViolationSummary = (summary = {}) => {
-    const entries = Object.entries(summary);
-    if (!entries.length) {
-      return 'None';
-    }
-    return entries.map(([type, count]) => `${type} (${count})`).join(', ');
-  };
-
-  const loadAssessments = async () => {
-    const response = await api.get('/api/assessments');
-    setAssessments(response.data.assessments || []);
-  };
+  const [tab, setTab] = useState('summary');
 
   useEffect(() => {
+    const loadAssessments = async () => {
+      try {
+        const response = await api.get('/api/assessments');
+        setAssessments(response.data.assessments || []);
+      } catch (err) {
+        setAssessments([]);
+      }
+    };
+
     loadAssessments();
   }, []);
 
   const handleSelect = async (session) => {
     setSelected(session);
-    const [detailResponse, violationsResponse, answersResponse] = await Promise.all([
-      api.get(`/api/assessments/${session.sessionId}/detail`),
-      api.get(`/api/admin/violations/${session.sessionId}`),
-      api.get(`/api/admin/answers/${session.sessionId}`)
-    ]);
-
-    const labels = violationsResponse.data.students.map((student) => student.name);
-    const counts = violationsResponse.data.students.map((student) => (student.violations || []).length);
-
-    setSelectedQuestions(detailResponse.data.questions || []);
-    setSelectedStudents(answersResponse.data.students || []);
-    setViolationsData({
-      labels,
-      datasets: [
-        { label: 'Violations', data: counts, backgroundColor: '#ff8a2a', borderRadius: 14 }
-      ]
-    });
+    setMessage('');
+    try {
+      const response = await api.get(`/api/admin/session/${session.sessionId}/overview`);
+      const labels = (response.data.violations || []).map((student) => student.name);
+      const counts = (response.data.violations || []).map((student) => (student.violations || []).length);
+      setSelectedQuestions(response.data.questions || []);
+      setSelectedStudents(response.data.students || []);
+      setViolationsData({
+        labels,
+        datasets: [
+          { label: 'Violations', data: counts, backgroundColor: '#ff8a2a', borderRadius: 10 }
+        ]
+      });
+      setSelected(response.data.assessment || session);
+    } catch (err) {
+      setMessage(err.response?.data?.error || 'Unable to load session overview');
+    }
   };
 
   const handleDelete = async (sessionId) => {
@@ -82,7 +100,8 @@ export default function PreviousPage() {
       setViolationsData(null);
     }
     setMessage('Session deleted');
-    loadAssessments();
+    const response = await api.get('/api/assessments');
+    setAssessments(response.data.assessments || []);
   };
 
   const handleExport = async (sessionId) => {
@@ -129,49 +148,49 @@ export default function PreviousPage() {
     }
   };
 
+  const topScore = useMemo(() => selectedStudents.reduce((max, student) => Math.max(max, Number(student.score || 0)), 0), [selectedStudents]);
+
   return (
     <main className="page-shell surface-grid">
       <div className="page-wrap">
         <AdminNav />
-        {message && <div className="glass-banner mb-6 text-sm text-slate-700">{message}</div>}
-        <div className="grid gap-6 xl:grid-cols-[0.82fr_1.18fr]">
-          <div className="space-y-6 fade-rise">
+        {message && <div className="glass-banner mb-4 text-sm text-slate-700">{message}</div>}
+        <div className="grid gap-4 xl:grid-cols-[0.82fr_1.18fr]">
+          <div className="compact-stack fade-rise min-w-0">
             <div className="card-strong">
               <div className="badge-blue">Assessment Archive</div>
-              <h1 className="section-title mt-3">Previous sessions and full exports</h1>
-              <p className="mt-2 text-sm text-slate-600">
-                Review every assessment, inspect generated passwords, see archived participation counts, and export answers as CSV.
-              </p>
+              <h1 className="section-title mt-2">Previous sessions and exports</h1>
+              <p className="mt-2 text-sm text-slate-600">Archived sessions stay in compact cards with dates, exports, and delete controls always visible.</p>
             </div>
-            <div className="space-y-4">
+            <div className="compact-stack">
               {assessments.map((session) => (
                 <div key={session.sessionId} className="card">
                   <div className="flex flex-wrap items-start justify-between gap-3">
-                    <div>
-                      <p className="font-semibold text-slate-900">{session.name}</p>
-                      <p className="mt-1 text-sm text-slate-500">Session ID: {session.sessionId}</p>
+                    <div className="min-w-0">
+                      <p className="truncate font-semibold text-slate-900">{session.name}</p>
+                      <p className="mt-1 text-xs text-slate-500">Session ID: {session.sessionId}</p>
                     </div>
-                    <span className={session.status === 'active' ? 'badge-orange' : 'badge-slate'}>{session.status}</span>
+                    <span className={session.status === 'live' ? 'badge-orange' : 'badge-slate'}>{session.status}</span>
                   </div>
-                  <div className="mt-4 grid gap-3 sm:grid-cols-4">
+                  <div className="mt-3 grid gap-2 sm:grid-cols-4">
                     <div className="stat-card">
-                      <p className="section-kicker">Password</p>
-                      <p className="mt-2 text-base font-semibold tracking-[0.15em]">{session.password}</p>
+                      <p className="section-kicker">Date</p>
+                      <p className="mt-2 text-xs font-semibold">{formatDateTime(session.createdAt)}</p>
                     </div>
                     <div className="stat-card">
                       <p className="section-kicker">Questions</p>
-                      <p className="mt-2 text-lg font-semibold">{session.questionCount || 0}</p>
+                      <p className="mt-2 text-sm font-semibold">{session.questionCount || 0}</p>
                     </div>
                     <div className="stat-card">
                       <p className="section-kicker">Students</p>
-                      <p className="mt-2 text-lg font-semibold">{session.studentCount || 0}</p>
+                      <p className="mt-2 text-sm font-semibold">{session.studentCount || 0}</p>
                     </div>
                     <div className="stat-card">
                       <p className="section-kicker">Creator</p>
-                      <p className="mt-2 text-base font-semibold">{session.createdBy || 'Unknown'}</p>
+                      <p className="mt-2 text-xs font-semibold">{session.createdBy || 'Unknown'}</p>
                     </div>
                   </div>
-                  <div className="mt-4 flex flex-wrap gap-2">
+                  <div className="mt-3 flex flex-wrap gap-2">
                     <button className="btn-outline" onClick={() => handleSelect(session)}>View</button>
                     <button className="btn-primary" onClick={() => handleExport(session.sessionId)} disabled={downloadingId === session.sessionId}>
                       {downloadingId === session.sessionId ? 'Exporting...' : 'Export CSV'}
@@ -186,34 +205,36 @@ export default function PreviousPage() {
             </div>
           </div>
 
-          <div className="space-y-6 fade-rise">
+          <div className="compact-stack fade-rise min-w-0">
             <div className="card-strong">
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div>
                   <p className="section-kicker">Selected Session</p>
-                  <h2 className="section-title mt-2">{selected ? selected.name : 'Choose a session to inspect'}</h2>
+                  <h2 className="section-title mt-1">{selected ? selected.name : 'Choose a session to inspect'}</h2>
                 </div>
                 {selected && <span className="badge-blue">{selected.sessionId}</span>}
               </div>
               {selected ? (
-                <div className="mt-6 grid gap-4 md:grid-cols-4">
+                <div className="mt-4 grid gap-3 md:grid-cols-5">
+                  <div className="stat-card">
+                    <p className="section-kicker">Date</p>
+                    <p className="mt-2 text-xs font-semibold">{formatDateTime(selected.createdAt)}</p>
+                  </div>
                   <div className="stat-card">
                     <p className="section-kicker">Password</p>
-                    <p className="mt-2 text-lg font-semibold tracking-[0.18em]">{selected.password}</p>
+                    <p className="mt-2 break-all text-xs font-semibold tracking-[0.12em]">{selected.password}</p>
                   </div>
                   <div className="stat-card">
                     <p className="section-kicker">Questions</p>
-                    <p className="mt-2 text-lg font-semibold">{selectedQuestions.length}</p>
+                    <p className="mt-2 text-sm font-semibold">{selectedQuestions.length}</p>
                   </div>
                   <div className="stat-card">
                     <p className="section-kicker">Students</p>
-                    <p className="mt-2 text-lg font-semibold">{selectedStudents.length}</p>
+                    <p className="mt-2 text-sm font-semibold">{selectedStudents.length}</p>
                   </div>
                   <div className="stat-card">
                     <p className="section-kicker">Top Score</p>
-                    <p className="mt-2 text-lg font-semibold">
-                      {selectedStudents.reduce((max, student) => Math.max(max, Number(student.score || 0)), 0)}
-                    </p>
+                    <p className="mt-2 text-sm font-semibold">{topScore}</p>
                   </div>
                 </div>
               ) : (
@@ -222,76 +243,88 @@ export default function PreviousPage() {
             </div>
 
             <div className="card">
-              <h3 className="section-title text-xl">Violations Overview</h3>
-              <div className="mt-4">
-                {violationsData ? (
-                  <Bar data={violationsData} options={{ responsive: true, plugins: { legend: { display: false } } }} />
-                ) : (
-                  <p className="text-sm text-slate-500">No chart yet. Select a session to render student violations.</p>
-                )}
+              <div className="panel-tabs">
+                {[
+                  ['summary', 'Summary'],
+                  ['questions', `Questions (${selectedQuestions.length})`],
+                  ['results', `Results (${selectedStudents.length})`]
+                ].map(([key, label]) => (
+                  <button key={key} className={`tab-chip ${tab === key ? 'tab-chip-active' : ''}`} onClick={() => setTab(key)}>
+                    {label}
+                  </button>
+                ))}
               </div>
-            </div>
 
-            {selected && (
-              <div className="grid gap-6 lg:grid-cols-2">
-                <div className="card">
-                  <h3 className="section-title text-xl">Question Preview</h3>
-                  <div className="mt-4 space-y-3">
-                    {selectedQuestions.map((question, index) => (
-                      <div key={question.id} className="rounded-[22px] border border-[rgba(17,33,61,0.08)] bg-white/70 p-4">
-                        <div className="font-semibold text-slate-900">
-                          <span>Q{index + 1}. </span>
-                          <MathText text={question.question} />
-                        </div>
-                        <p className="mt-2 text-sm text-slate-500">
-                          Dedicated time: {question.customTime ? `${question.customTime}s` : 'Uses default'}
-                        </p>
+              {tab === 'summary' && (
+                <div className="mt-4">
+                  <h3 className="section-title text-lg">Violations Overview</h3>
+                  <div className="mt-4">
+                    {violationsData ? (
+                      <Bar data={violationsData} options={{ responsive: true, plugins: { legend: { display: false } } }} />
+                    ) : (
+                      <p className="text-sm text-slate-500">No chart yet. Select a session to render student violations.</p>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {tab === 'questions' && (
+                <div className="mt-4 compact-stack">
+                  {selectedQuestions.map((question, index) => (
+                    <div key={question.id} className="table-shell p-3">
+                      <div className="font-semibold text-slate-900">
+                        <span>Q{index + 1}. </span>
+                        <MathText text={question.question} />
                       </div>
-                    ))}
-                  </div>
+                      <p className="mt-2 text-xs text-slate-500">Dedicated time: {question.customTime ? `${question.customTime}s` : 'Uses default'}</p>
+                    </div>
+                  ))}
+                  {!selectedQuestions.length && <div className="table-shell p-3 text-sm text-slate-500">No question preview loaded.</div>}
                 </div>
+              )}
 
-                <div className="card">
-                  <h3 className="section-title text-xl">Participants Leaderboard</h3>
-                  <div className="mt-4 overflow-x-auto">
-                    <table className="min-w-full text-sm">
-                      <thead>
-                        <tr className="border-b border-[rgba(17,33,61,0.08)] text-left text-slate-500">
-                          <th className="px-3 py-3 font-medium">Rank</th>
-                          <th className="px-3 py-3 font-medium">Name</th>
-                          <th className="px-3 py-3 font-medium">Phone</th>
-                          <th className="px-3 py-3 font-medium">Score</th>
-                          <th className="px-3 py-3 font-medium">Correct</th>
-                          <th className="px-3 py-3 font-medium">Accuracy</th>
-                          <th className="px-3 py-3 font-medium">Violations</th>
-                          <th className="px-3 py-3 font-medium">Violation Types</th>
+              {tab === 'results' && (
+                <div className="mt-4 table-shell compact-scroll">
+                  <table className="min-w-full text-xs">
+                    <thead>
+                      <tr className="border-b border-[rgba(17,33,61,0.08)] text-left text-slate-500">
+                        <th className="px-3 py-2 font-medium">Rank</th>
+                        <th className="px-3 py-2 font-medium">Name</th>
+                        <th className="px-3 py-2 font-medium">Phone</th>
+                        <th className="px-3 py-2 font-medium">Score</th>
+                        <th className="px-3 py-2 font-medium">Correct</th>
+                        <th className="px-3 py-2 font-medium">Accuracy</th>
+                        <th className="px-3 py-2 font-medium">Violations</th>
+                        <th className="px-3 py-2 font-medium">Violation Types</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {selectedStudents.map((student) => (
+                        <tr key={student.studentId} className="border-b border-[rgba(17,33,61,0.06)] align-top text-slate-700">
+                          <td className="px-3 py-2 font-semibold text-slate-900">{student.rank || '-'}</td>
+                          <td className="px-3 py-2">
+                            <div className="font-semibold text-slate-900">{student.name}</div>
+                            <div className="mt-1 text-[11px] text-slate-500">{student.status}</div>
+                            {student.attemptedFullscreenExit && <div className="mt-1 text-[11px] font-semibold text-orange-700">Attempted fullscreen exit</div>}
+                          </td>
+                          <td className="px-3 py-2">{student.phone}</td>
+                          <td className="px-3 py-2 font-semibold text-slate-900">{student.score || 0}</td>
+                          <td className="px-3 py-2">{student.correctCount || 0}/{student.totalQuestions || 0}</td>
+                          <td className="px-3 py-2">{student.accuracy || 0}%</td>
+                          <td className="px-3 py-2">{student.violationCount || 0}</td>
+                          <td className="px-3 py-2">{formatViolationSummary(student.violationSummary)}</td>
                         </tr>
-                      </thead>
-                      <tbody>
-                        {selectedStudents.map((student) => (
-                          <tr key={student.studentId} className="border-b border-[rgba(17,33,61,0.06)] align-top text-slate-700">
-                            <td className="px-3 py-3 font-semibold text-slate-900">{student.rank || '-'}</td>
-                            <td className="px-3 py-3">
-                              <div className="font-semibold text-slate-900">{student.name}</div>
-                              <div className="mt-1 text-xs text-slate-500">{student.status}</div>
-                              {student.attemptedFullscreenExit && (
-                                <div className="mt-1 text-xs font-semibold text-orange-700">Attempted fullscreen exit</div>
-                              )}
-                            </td>
-                            <td className="px-3 py-3">{student.phone}</td>
-                            <td className="px-3 py-3 font-semibold text-slate-900">{student.score || 0}</td>
-                            <td className="px-3 py-3">{student.correctCount || 0}/{student.totalQuestions || 0}</td>
-                            <td className="px-3 py-3">{student.accuracy || 0}%</td>
-                            <td className="px-3 py-3">{student.violationCount || 0}</td>
-                            <td className="px-3 py-3">{formatViolationSummary(student.violationSummary)}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
+                      ))}
+                      {!selectedStudents.length && (
+                        <tr>
+                          <td className="px-3 py-4 text-slate-500" colSpan={8}>No participant results loaded.</td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
                 </div>
-              </div>
-            )}
+              )}
+            </div>
           </div>
         </div>
       </div>

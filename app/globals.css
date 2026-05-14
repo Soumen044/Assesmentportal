@@ -29,6 +29,7 @@ body {
   min-height: 100vh;
   color: var(--ink);
   font-family: var(--font-body), 'Trebuchet MS', sans-serif;
+  font-size: 14px;
   background:
     radial-gradient(circle at top left, rgba(255, 138, 42, 0.24), transparent 26%),
     radial-gradient(circle at top right, rgba(29, 114, 255, 0.22), transparent 24%),
@@ -48,7 +49,7 @@ select {
 }
 
 .page-shell {
-  @apply min-h-screen px-4 py-6 md:px-8 md:py-8;
+  @apply min-h-screen px-3 py-4 md:px-5 md:py-5;
 }
 
 .page-wrap {
@@ -61,27 +62,35 @@ select {
 }
 
 .hero-subtitle {
-  @apply text-base leading-7 text-slate-600 md:text-lg;
+  @apply text-sm leading-6 text-slate-600 md:text-base;
 }
 
 .card {
-  @apply rounded-[28px] border p-6 shadow-[0_24px_80px_rgba(17,33,61,0.08)];
+  @apply rounded-[24px] border p-4 shadow-[0_18px_60px_rgba(17,33,61,0.08)];
   background: linear-gradient(180deg, rgba(255,255,255,0.98) 0%, rgba(255,251,245,0.98) 100%);
   border-color: var(--line);
   backdrop-filter: blur(16px);
+  overflow: hidden;
+  min-width: 0;
+  word-break: break-word;
 }
 
 .card-strong {
-  @apply rounded-[32px] border p-6 shadow-[0_28px_90px_rgba(17,33,61,0.12)];
+  @apply rounded-[26px] border p-4 shadow-[0_22px_72px_rgba(17,33,61,0.12)];
   background:
     linear-gradient(135deg, rgba(255,255,255,0.98) 0%, rgba(255,247,237,0.98) 48%, rgba(240,247,255,0.98) 100%);
   border-color: rgba(29, 114, 255, 0.12);
+  overflow: hidden;
+  min-width: 0;
+  word-break: break-word;
 }
 
 .glass-banner {
-  @apply rounded-[28px] border px-5 py-4;
+  @apply rounded-[20px] border px-4 py-3;
   border-color: rgba(255, 138, 42, 0.18);
   background: linear-gradient(135deg, rgba(255,138,42,0.12), rgba(29,114,255,0.08));
+  overflow: hidden;
+  min-width: 0;
 }
 
 .surface-grid {
@@ -92,7 +101,7 @@ select {
 }
 
 .btn {
-  @apply inline-flex items-center justify-center gap-2 rounded-full px-5 py-3 text-sm font-semibold transition duration-200 ease-out disabled:cursor-not-allowed disabled:opacity-60;
+  @apply inline-flex items-center justify-center gap-2 rounded-full px-4 py-2 text-xs font-semibold transition duration-200 ease-out disabled:cursor-not-allowed disabled:opacity-60;
 }
 
 .btn-primary {
@@ -117,10 +126,11 @@ select {
 }
 
 .input {
-  @apply w-full rounded-2xl border px-4 py-3 text-sm outline-none transition;
+  @apply w-full rounded-2xl border px-3 py-2 text-sm outline-none transition;
   border-color: rgba(17, 33, 61, 0.12);
   background: rgba(255, 255, 255, 0.88);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.6);
+  min-width: 0;
 }
 
 .input:focus,
@@ -131,11 +141,11 @@ select.input:focus {
 }
 
 .textarea {
-  @apply input min-h-28 resize-y;
+  @apply input min-h-24 resize-y;
 }
 
 .label {
-  @apply mb-2 block text-sm font-medium text-slate-600;
+  @apply mb-1 block text-xs font-semibold uppercase tracking-[0.12em] text-slate-500;
 }
 
 .badge {
@@ -157,14 +167,16 @@ select.input:focus {
 }
 
 .stat-card {
-  @apply rounded-[24px] border p-5;
+  @apply rounded-[20px] border p-3;
   border-color: rgba(17, 33, 61, 0.08);
   background: rgba(255, 255, 255, 0.82);
+  overflow: hidden;
+  min-width: 0;
 }
 
 .section-title {
   font-family: var(--font-display), 'Trebuchet MS', sans-serif;
-  @apply text-2xl font-semibold tracking-tight;
+  @apply text-xl font-semibold tracking-tight;
 }
 
 .section-kicker {
@@ -183,6 +195,53 @@ select.input:focus {
   box-shadow:
     0 0 0 1px rgba(255, 255, 255, 0.5),
     0 25px 80px rgba(17, 33, 61, 0.08);
+}
+
+.panel-tabs {
+  @apply flex flex-wrap gap-2;
+}
+
+.tab-chip {
+  @apply rounded-full border px-3 py-1.5 text-xs font-semibold transition;
+  border-color: rgba(17, 33, 61, 0.1);
+  background: rgba(255, 255, 255, 0.78);
+  color: #475569;
+}
+
+.tab-chip-active {
+  background: linear-gradient(135deg, rgba(29, 114, 255, 0.14), rgba(255, 138, 42, 0.12));
+  border-color: rgba(29, 114, 255, 0.2);
+  color: #0f3e9f;
+}
+
+.compact-scroll {
+  @apply overflow-auto;
+  scrollbar-width: thin;
+}
+
+.compact-stack {
+  @apply space-y-4;
+}
+
+.table-shell {
+  @apply rounded-[20px] border bg-white/80;
+  border-color: rgba(17, 33, 61, 0.08);
+  overflow: hidden;
+}
+
+.text-compact {
+  @apply text-xs leading-5;
+}
+
+.content-safe {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+img,
+svg,
+canvas {
+  max-width: 100%;
 }
 
 @keyframes fade-rise {
@@ -213,6 +272,6 @@ select.input:focus {
 
   .card,
   .card-strong {
-    @apply rounded-[24px] p-5;
+    @apply rounded-[20px] p-4;
   }
 }
