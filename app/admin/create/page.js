@@ -292,7 +292,7 @@ export default function CreateAssessmentPage() {
 
         {message && <div className="glass-banner mb-4 fade-rise text-sm text-slate-700">{message}</div>}
 
-        <div className="grid gap-4 lg:grid-cols-[0.72fr_1.28fr]">
+        <div className="grid gap-3 lg:grid-cols-[0.72fr_1.28fr]">
           <aside className="compact-stack min-w-0">
             <div className="card-strong fade-rise">
               <div className="flex flex-wrap items-center justify-between gap-3">
@@ -301,7 +301,7 @@ export default function CreateAssessmentPage() {
                   {session.status || 'draft'}
                 </span>
               </div>
-              <div className="mt-4 compact-stack">
+              <div className="mt-3 compact-stack">
                 <div>
                   <label className="label">Assessment Name</label>
                   <input className="input" value={session.name} onChange={(event) => setSession((prev) => ({ ...prev, name: event.target.value }))} disabled={sessionReady} />
@@ -315,10 +315,10 @@ export default function CreateAssessmentPage() {
                     {loading ? 'Creating session...' : 'Create Session First'}
                   </button>
                 ) : (
-                  <div className="rounded-[20px] border border-[rgba(255,138,42,0.16)] bg-[rgba(255,138,42,0.08)] p-3">
+                  <div className="rounded-[16px] border border-[rgba(255,138,42,0.16)] bg-[rgba(255,138,42,0.08)] p-3">
                     <p className="section-kicker">Generated Password</p>
-                    <p className="mt-2 break-all text-2xl font-semibold tracking-[0.16em] text-slate-900">{session.password}</p>
-                    <button className="btn-accent mt-3" onClick={handleCopyPassword}>Copy Password</button>
+                    <p className="mt-2 break-all text-lg font-semibold tracking-[0.14em] text-slate-900">{session.password}</p>
+                    <button className="btn-accent mt-2" onClick={handleCopyPassword}>Copy Password</button>
                   </div>
                 )}
               </div>
@@ -326,7 +326,7 @@ export default function CreateAssessmentPage() {
 
             <div className="card fade-rise">
               <p className="section-kicker">Session Snapshot</p>
-              <div className="mt-3 grid gap-2">
+              <div className="mt-2 grid gap-2">
                 <div className="stat-card">
                   <p className="section-kicker">Question Count</p>
                   <p className="mt-2 text-xl font-semibold">{questions.length}</p>
@@ -378,7 +378,7 @@ export default function CreateAssessmentPage() {
                     <a className="btn-outline" href={sampleTemplateUrl} target="_blank" rel="noreferrer">Download Sample .xlsx</a>
                   </div>
 
-                  <div className="mt-4 panel-tabs">
+                    <div className="mt-3 panel-tabs">
                     {[
                       ['manual', editingQuestion ? 'Edit Builder' : 'Manual Builder'],
                       ['preview', `Question Preview (${questions.length})`],
@@ -391,7 +391,7 @@ export default function CreateAssessmentPage() {
                   </div>
 
                   {canvasTab === 'manual' && (
-                    <div className="mt-4 grid gap-4 xl:grid-cols-[0.9fr_1.1fr]">
+                    <div className="mt-3 grid gap-3 xl:grid-cols-[0.9fr_1.1fr]">
                       <div className="compact-stack">
                         <div className="table-shell p-3">
                           <label className="label">Upload Question Sheet</label>
@@ -421,7 +421,7 @@ export default function CreateAssessmentPage() {
                           <p className="section-kicker">Builder Notes</p>
                           <span className="badge-blue">{questions.length} ready</span>
                         </div>
-                        <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                        <div className="mt-2 grid gap-2 sm:grid-cols-2">
                           <div className="stat-card">
                             <p className="section-kicker">Fast CRUD</p>
                             <p className="mt-2 text-compact text-slate-600">Question add, update, duplicate, and delete now reuse the returned payload instead of refetching the whole screen.</p>
@@ -436,7 +436,7 @@ export default function CreateAssessmentPage() {
                   )}
 
                   {canvasTab === 'preview' && (
-                    <div className="mt-4 compact-stack">
+                    <div className="mt-3 compact-stack">
                       {!questions.length && <div className="table-shell p-3 text-sm text-slate-500">No questions yet. Create or upload at least one question to continue.</div>}
                       {questions.map((question, index) => (
                         <div
@@ -468,9 +468,9 @@ export default function CreateAssessmentPage() {
                               <button className="btn-ghost" onClick={() => moveQuestion(index, 1)} disabled={index === questions.length - 1}>Down</button>
                             </div>
                           </div>
-                          <div className="mt-3 grid gap-2 md:grid-cols-2">
+                          <div className="mt-2 grid gap-2 md:grid-cols-2">
                             {Object.entries(question.options || {}).map(([key, value]) => (
-                              <div key={key} className={`rounded-2xl px-3 py-2 text-xs ${question.answer === key ? 'bg-[rgba(29,114,255,0.08)] text-blue-900' : 'bg-slate-50 text-slate-600'}`}>
+                              <div key={key} className={`rounded-xl px-2.5 py-2 text-xs ${question.answer === key ? 'bg-[rgba(29,114,255,0.08)] text-blue-900' : 'bg-slate-50 text-slate-600'}`}>
                                 <span className="font-semibold">{key}.</span>{' '}
                                 <MathText text={value} />
                               </div>
@@ -513,7 +513,7 @@ export default function CreateAssessmentPage() {
                 <h2 className="section-title mt-2">Timing and behavior settings</h2>
                 <p className="mt-2 text-sm text-slate-600">Keep timer controls compact while still exposing the full timing map.</p>
 
-                <div className="mt-4 grid gap-3 md:grid-cols-3">
+                <div className="mt-3 grid grid-cols-2 gap-2 md:grid-cols-3">
                   <div className="stat-card">
                     <p className="section-kicker">Question Count</p>
                     <p className="mt-2 text-xl font-semibold">{questions.length}</p>
@@ -528,7 +528,7 @@ export default function CreateAssessmentPage() {
                   </div>
                 </div>
 
-                <div className="mt-3 grid gap-3 md:grid-cols-3">
+                <div className="mt-2 grid grid-cols-2 gap-2 md:grid-cols-3">
                   <div className="stat-card">
                     <p className="section-kicker">Question Sum</p>
                     <p className="mt-2 text-sm font-semibold">{formatSeconds(runtimeSummary.questionSum)}</p>
@@ -543,10 +543,10 @@ export default function CreateAssessmentPage() {
                   </div>
                 </div>
 
-                <div className="mt-4 grid gap-3 md:grid-cols-2">
+                <div className="mt-3 grid gap-2 md:grid-cols-2">
                   <div className="table-shell p-3">
                     <label className="label">Whole Assessment Timer</label>
-                    <label className="mt-2 flex items-center gap-3 rounded-2xl border border-[rgba(29,114,255,0.14)] bg-[rgba(29,114,255,0.06)] px-4 py-3 text-sm text-slate-600">
+                    <label className="mt-2 flex items-center gap-2 rounded-xl border border-[rgba(29,114,255,0.14)] bg-[rgba(29,114,255,0.06)] px-3 py-2 text-xs text-slate-600">
                       <input type="checkbox" checked={settings.enableTotalTimer} onChange={(event) => setSettings((prev) => ({ ...prev, enableTotalTimer: event.target.checked }))} />
                       Enforce an overall countdown
                     </label>
@@ -554,7 +554,7 @@ export default function CreateAssessmentPage() {
                   </div>
                   <div className="table-shell p-3">
                     <label className="label">Per-Question Timer</label>
-                    <label className="mt-2 flex items-center gap-3 rounded-2xl border border-[rgba(255,138,42,0.14)] bg-[rgba(255,138,42,0.08)] px-4 py-3 text-sm text-slate-600">
+                    <label className="mt-2 flex items-center gap-2 rounded-xl border border-[rgba(255,138,42,0.14)] bg-[rgba(255,138,42,0.08)] px-3 py-2 text-xs text-slate-600">
                       <input type="checkbox" checked={settings.enableQuestionTimer} onChange={(event) => setSettings((prev) => ({ ...prev, enableQuestionTimer: event.target.checked }))} />
                       Auto-skip each question on timeout
                     </label>
@@ -562,18 +562,18 @@ export default function CreateAssessmentPage() {
                   </div>
                 </div>
 
-                <div className="mt-3 grid gap-3 md:grid-cols-2">
-                  <label className="flex items-center gap-3 rounded-2xl border border-[rgba(255,138,42,0.14)] bg-[rgba(255,138,42,0.08)] px-4 py-3 text-sm text-slate-600">
+                <div className="mt-2 grid gap-2 md:grid-cols-2">
+                  <label className="flex items-center gap-2 rounded-xl border border-[rgba(255,138,42,0.14)] bg-[rgba(255,138,42,0.08)] px-3 py-2 text-xs text-slate-600">
                     <input type="checkbox" checked={settings.shuffleQuestions} onChange={(event) => setSettings((prev) => ({ ...prev, shuffleQuestions: event.target.checked }))} />
                     Shuffle question order once at start
                   </label>
-                  <label className="flex items-center gap-3 rounded-2xl border border-[rgba(29,114,255,0.14)] bg-[rgba(29,114,255,0.06)] px-4 py-3 text-sm text-slate-600">
+                  <label className="flex items-center gap-2 rounded-xl border border-[rgba(29,114,255,0.14)] bg-[rgba(29,114,255,0.06)] px-3 py-2 text-xs text-slate-600">
                     <input type="checkbox" checked={settings.shuffleOptions} onChange={(event) => setSettings((prev) => ({ ...prev, shuffleOptions: event.target.checked }))} />
                     Shuffle answer options once at start
                   </label>
                 </div>
 
-                <div className="mt-3 grid gap-3 md:grid-cols-2">
+                <div className="mt-2 grid gap-2 md:grid-cols-2">
                   <div>
                     <label className="label">Violation Threshold</label>
                     <input className="input" type="number" min="1" max="10" value={settings.violationThreshold} onChange={(event) => setSettings((prev) => ({ ...prev, violationThreshold: event.target.value }))} />
@@ -584,25 +584,25 @@ export default function CreateAssessmentPage() {
                   </div>
                 </div>
 
-                <div className="mt-4 table-shell compact-scroll">
-                  <table className="min-w-full text-xs">
+                <div className="mt-3 table-shell compact-scroll">
+                  <table className="min-w-full text-[11px]">
                     <thead>
                       <tr className="border-b border-[rgba(17,33,61,0.08)] text-left text-slate-500">
-                        <th className="px-3 py-2 font-medium">Q</th>
-                        <th className="px-3 py-2 font-medium">Prompt</th>
-                        <th className="px-3 py-2 font-medium">Timer</th>
-                        <th className="px-3 py-2 font-medium">Source</th>
+                        <th className="px-2 py-2 font-medium">Q</th>
+                        <th className="px-2 py-2 font-medium">Prompt</th>
+                        <th className="px-2 py-2 font-medium">Timer</th>
+                        <th className="px-2 py-2 font-medium">Source</th>
                       </tr>
                     </thead>
                     <tbody>
                       {questions.map((question, index) => (
                         <tr key={question.id} className="border-b border-[rgba(17,33,61,0.06)] align-top">
-                          <td className="px-3 py-2 font-semibold text-slate-900">{index + 1}</td>
-                          <td className="px-3 py-2 text-slate-700"><MathText text={question.question} /></td>
-                          <td className="px-3 py-2 font-medium text-slate-900">
+                          <td className="px-2 py-2 font-semibold text-slate-900">{index + 1}</td>
+                          <td className="px-2 py-2 text-slate-700"><MathText text={question.question} /></td>
+                          <td className="px-2 py-2 font-medium text-slate-900">
                             {settings.enableQuestionTimer ? formatSeconds(question.customTime || settings.defaultQuestionTime) : 'No per-question timer'}
                           </td>
-                          <td className="px-3 py-2 text-slate-600">
+                          <td className="px-2 py-2 text-slate-600">
                             {question.customTime ? 'Dedicated question timer' : settings.enableQuestionTimer ? 'Default question timer' : settings.enableTotalTimer ? 'Assessment timer only' : 'No timer'}
                           </td>
                         </tr>
@@ -632,7 +632,7 @@ export default function CreateAssessmentPage() {
                     </button>
                   </div>
 
-                  <div className="mt-4 grid gap-3 md:grid-cols-5">
+                  <div className="mt-3 grid grid-cols-2 gap-2 md:grid-cols-5">
                     <div className="stat-card">
                       <p className="section-kicker">Session ID</p>
                       <p className="mt-2 text-sm font-semibold">{session.sessionId}</p>
@@ -656,7 +656,7 @@ export default function CreateAssessmentPage() {
                   </div>
 
                   {previewOpen && (
-                    <div className="mt-4 compact-stack">
+                    <div className="mt-3 compact-stack">
                       {questions.map((question, index) => (
                         <div key={question.id} className="card">
                           <div className="flex flex-wrap items-center justify-between gap-3">
@@ -671,9 +671,9 @@ export default function CreateAssessmentPage() {
                             </div>
                             <span className="badge-slate">Answer {question.answer}</span>
                           </div>
-                          <div className="mt-3 grid gap-2 md:grid-cols-2">
+                          <div className="mt-2 grid gap-2 md:grid-cols-2">
                             {Object.entries(question.options || {}).map(([key, value]) => (
-                              <div key={key} className="rounded-2xl bg-slate-50 px-3 py-2 text-xs text-slate-600">
+                              <div key={key} className="rounded-xl bg-slate-50 px-2.5 py-2 text-xs text-slate-600">
                                 <span className="font-semibold text-slate-900">{key}.</span>{' '}
                                 <MathText text={value} />
                               </div>
@@ -696,7 +696,7 @@ export default function CreateAssessmentPage() {
                     )}
                   </div>
                   {(session.status === 'waiting_room' || session.status === 'live') && (
-                    <div className="mt-3 rounded-[20px] border border-[rgba(29,114,255,0.14)] bg-[rgba(29,114,255,0.06)] px-4 py-3 text-sm text-slate-700">
+                    <div className="mt-3 rounded-[16px] border border-[rgba(29,114,255,0.14)] bg-[rgba(29,114,255,0.06)] px-3 py-2 text-xs text-slate-700">
                       Session status: <span className="font-semibold text-slate-900">{session.status}</span>. Students may wait in the lobby after the room is opened, and only begin once you launch the live exam.
                     </div>
                   )}

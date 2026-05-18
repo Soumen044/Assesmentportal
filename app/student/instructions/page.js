@@ -156,8 +156,45 @@ export default function InstructionsPage() {
   return (
     <main className="page-shell surface-grid">
       <div className="page-wrap">
-        <section className="grid gap-4 lg:grid-cols-[1.05fr_0.95fr] fade-rise">
-          <div className="compact-stack min-w-0">
+        <section className="grid gap-3 lg:grid-cols-[0.98fr_1.02fr] fade-rise">
+          <div className="card order-1 lg:order-2">
+            <div className="badge-orange">Candidate Checklist</div>
+            <div className="mt-3 grid grid-cols-2 gap-2">
+              <div className="stat-card">
+                <p className="section-kicker">Resume Count</p>
+                <p className="mt-1 text-base font-semibold text-slate-900">{runtime?.student?.resumeCount ?? 0}</p>
+              </div>
+              <div className="stat-card">
+                <p className="section-kicker">Violations</p>
+                <p className="mt-1 text-base font-semibold text-slate-900">{runtime?.violationCount ?? 0}</p>
+              </div>
+            </div>
+
+            {!isLive && (
+              <div className="mt-3 rounded-[16px] border border-[rgba(29,114,255,0.14)] bg-[rgba(29,114,255,0.06)] px-3 py-2 text-xs text-slate-700">
+                Waiting for admin launch. Auto-refresh is active.
+              </div>
+            )}
+
+            {isLive && (
+              <>
+                <label className="mt-3 flex items-center gap-2 rounded-xl border border-[rgba(29,114,255,0.14)] bg-[rgba(29,114,255,0.05)] px-3 py-2 text-xs text-slate-600">
+                  <input type="checkbox" checked={ack} onChange={(event) => setAck(event.target.checked)} />
+                  I allow fullscreen monitoring for this attempt
+                </label>
+                <div className="mt-3 flex gap-2">
+                  <button className="btn-outline" onClick={enableFullscreen}>Enable Fullscreen</button>
+                  <button className="btn-primary flex-1" onClick={startExam} disabled={loading}>
+                    {loading ? 'Starting...' : 'Enter Exam'}
+                  </button>
+                </div>
+              </>
+            )}
+
+            {message && <p className="mt-3 text-xs text-red-600">{message}</p>}
+          </div>
+
+          <div className="compact-stack min-w-0 order-2 lg:order-1">
             <div className="card-strong">
               <div className="badge-blue">{isLive ? 'Live Launch Ready' : 'Waiting Room'}</div>
               <h1 className="hero-title mt-3 text-2xl md:text-4xl">
@@ -183,7 +220,7 @@ export default function InstructionsPage() {
               </div>
 
               {tab === 'session' && (
-                <div className="mt-4 grid gap-3 md:grid-cols-2">
+                <div className="mt-3 grid grid-cols-2 gap-2">
                   <div className="stat-card">
                     <p className="section-kicker">Session</p>
                     <p className="mt-2 text-sm font-semibold text-slate-900">{sessionMeta?.name || 'Awaiting session context'}</p>
@@ -206,7 +243,7 @@ export default function InstructionsPage() {
               )}
 
               {tab === 'rules' && (
-                <ul className="mt-4 space-y-2 text-sm text-slate-600">
+                <ul className="mt-3 space-y-1.5 text-xs text-slate-600">
                   <li>Stay on this page until the admin launches the exam.</li>
                   <li>Right-click is disabled inside the exam workspace.</li>
                   <li>Blur, tab switch, unload, fullscreen exit, and back-navigation attempts are logged as violations.</li>
@@ -214,43 +251,6 @@ export default function InstructionsPage() {
                 </ul>
               )}
             </div>
-          </div>
-
-          <div className="card">
-            <div className="badge-orange">Candidate Checklist</div>
-            <div className="mt-4 grid gap-3 md:grid-cols-2">
-              <div className="stat-card">
-                <p className="section-kicker">Resume Count</p>
-                <p className="mt-2 text-lg font-semibold text-slate-900">{runtime?.student?.resumeCount ?? 0}</p>
-              </div>
-              <div className="stat-card">
-                <p className="section-kicker">Violations</p>
-                <p className="mt-2 text-lg font-semibold text-slate-900">{runtime?.violationCount ?? 0}</p>
-              </div>
-            </div>
-
-            {!isLive && (
-              <div className="mt-4 rounded-[20px] border border-[rgba(29,114,255,0.14)] bg-[rgba(29,114,255,0.06)] px-4 py-3 text-sm text-slate-700">
-                Waiting for admin launch. This screen refreshes automatically.
-              </div>
-            )}
-
-            {isLive && (
-              <>
-                <label className="mt-4 flex items-center gap-3 rounded-2xl border border-[rgba(29,114,255,0.14)] bg-[rgba(29,114,255,0.05)] px-4 py-3 text-sm text-slate-600">
-                  <input type="checkbox" checked={ack} onChange={(event) => setAck(event.target.checked)} />
-                  I allow fullscreen monitoring for this assessment attempt
-                </label>
-                <div className="mt-4 flex gap-2">
-                  <button className="btn-outline" onClick={enableFullscreen}>Enable Fullscreen</button>
-                  <button className="btn-primary flex-1" onClick={startExam} disabled={loading}>
-                    {loading ? 'Starting...' : 'Enter Exam'}
-                  </button>
-                </div>
-              </>
-            )}
-
-            {message && <p className="mt-4 text-sm text-red-600">{message}</p>}
           </div>
         </section>
       </div>

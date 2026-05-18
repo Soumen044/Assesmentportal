@@ -50,7 +50,7 @@ export default function AdminDashboardPage() {
         <AdminNav />
         {message && <div className="glass-banner mb-4 text-sm text-slate-700">{message}</div>}
 
-        <section className="grid gap-4 xl:grid-cols-[1.08fr_0.92fr] fade-rise">
+        <section className="grid gap-3 xl:grid-cols-[1.08fr_0.92fr] fade-rise">
           <div className="compact-stack min-w-0">
             <div className="card-strong">
               <div className="flex flex-wrap items-start justify-between gap-3">
@@ -58,27 +58,27 @@ export default function AdminDashboardPage() {
                   <div className="badge-blue">Compact Admin View</div>
                   <h1 className="hero-title text-2xl md:text-3xl">Fast session control with less scrolling.</h1>
                   <p className="hero-subtitle max-w-2xl">
-                    The panel now keeps summaries, session dates, and notifications inside compact containers so the entire admin workflow fits cleanly at 100% zoom.
+                    Priority actions and summaries stay at the top so the admin workflow fits in less space.
                   </p>
                 </div>
                 <Link href="/admin/create" className="btn-primary">New Session</Link>
               </div>
-              <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+              <div className="mt-3 grid grid-cols-2 gap-2 xl:grid-cols-4">
                 <div className="stat-card">
                   <p className="section-kicker">All Sessions</p>
-                  <p className="mt-2 text-2xl font-semibold text-slate-900">{assessments.length}</p>
+                  <p className="mt-1 text-xl font-semibold text-slate-900">{assessments.length}</p>
                 </div>
                 <div className="stat-card">
                   <p className="section-kicker">Live Now</p>
-                  <p className="mt-2 text-2xl font-semibold text-blue-700">{activeCount}</p>
+                  <p className="mt-1 text-xl font-semibold text-blue-700">{activeCount}</p>
                 </div>
                 <div className="stat-card">
                   <p className="section-kicker">Waiting Rooms</p>
-                  <p className="mt-2 text-2xl font-semibold text-orange-600">{waitingCount}</p>
+                  <p className="mt-1 text-xl font-semibold text-orange-600">{waitingCount}</p>
                 </div>
                 <div className="stat-card">
                   <p className="section-kicker">Participants</p>
-                  <p className="mt-2 text-2xl font-semibold text-slate-900">{totalStudents}</p>
+                  <p className="mt-1 text-xl font-semibold text-slate-900">{totalStudents}</p>
                 </div>
               </div>
             </div>
@@ -171,17 +171,17 @@ export default function AdminDashboardPage() {
                 <div className="mt-4 grid gap-3 sm:grid-cols-3">
                   <Link href="/admin/create" className="card transition hover:-translate-y-1">
                     <div className="badge-orange">Create</div>
-                    <h3 className="mt-3 text-base font-semibold">Build Session</h3>
+                    <h3 className="mt-2 text-sm font-semibold">Build Session</h3>
                     <p className="mt-1 text-compact text-slate-600">Use tabs for session setup, questions, timing, and launch.</p>
                   </Link>
                   <Link href="/admin/live" className="card transition hover:-translate-y-1">
                     <div className="badge-blue">Monitor</div>
-                    <h3 className="mt-3 text-base font-semibold">Live Panel</h3>
+                    <h3 className="mt-2 text-sm font-semibold">Live Panel</h3>
                     <p className="mt-1 text-compact text-slate-600">View rosters, scoreboards, and session status without long page stacks.</p>
                   </Link>
                   <Link href="/admin/previous" className="card transition hover:-translate-y-1">
                     <div className="badge-slate">Archive</div>
-                    <h3 className="mt-3 text-base font-semibold">Previous Sessions</h3>
+                    <h3 className="mt-2 text-sm font-semibold">Previous Sessions</h3>
                     <p className="mt-1 text-compact text-slate-600">Open exports, charts, question reviews, and cleanup actions from tabs.</p>
                   </Link>
                 </div>
@@ -200,8 +200,8 @@ export default function AdminDashboardPage() {
               </div>
               <div className="mt-4 compact-stack">
                 {recentSessions.map((assessment, index) => (
-                  <div key={assessment.sessionId} className="flex items-start gap-3 rounded-[18px] border border-[rgba(17,33,61,0.08)] bg-white/80 p-3">
-                    <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[rgba(29,114,255,0.1)] text-xs font-semibold text-blue-700">
+                  <div key={assessment.sessionId} className="flex items-start gap-2 rounded-[16px] border border-[rgba(17,33,61,0.08)] bg-white/80 p-2.5">
+                    <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[rgba(29,114,255,0.1)] text-[11px] font-semibold text-blue-700">
                       {index + 1}
                     </div>
                     <div className="min-w-0">

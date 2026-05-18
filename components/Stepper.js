@@ -2,11 +2,11 @@
 
 export default function Stepper({ steps, current }) {
   return (
-    <div className="mb-6 flex flex-wrap items-center gap-3 fade-rise">
+    <div className="compact-scroll mb-3 flex items-center gap-2 fade-rise">
       {steps.map((step, index) => (
-        <div key={step} className="flex items-center gap-2 rounded-full bg-white/70 px-3 py-2 shadow-sm">
+        <div key={step} className="flex shrink-0 items-center gap-2 rounded-full bg-white/70 px-2.5 py-1.5 shadow-sm">
           <div
-            className={`flex h-9 w-9 items-center justify-center rounded-full text-sm font-semibold ${
+            className={`flex h-7 w-7 items-center justify-center rounded-full text-[11px] font-semibold ${
               index === current
                 ? 'bg-[linear-gradient(135deg,#ff8a2a,#1d72ff)] text-white'
                 : index < current
@@ -16,7 +16,7 @@ export default function Stepper({ steps, current }) {
           >
             {index + 1}
           </div>
-          <span className={`${index === current ? 'text-slate-900 font-semibold' : 'text-slate-600'}`}>{step}</span>
+          <span className={`text-[11px] ${index === current ? 'font-semibold text-slate-900' : 'text-slate-600'}`}>{step}</span>
         </div>
       ))}
     </div>

@@ -58,36 +58,36 @@ export default function StudentResultPage() {
               <div>
                 <div className="badge-orange">Assessment Submitted</div>
                 <h1 className="hero-title mt-3 text-2xl md:text-4xl">{session.name}</h1>
-                <p className="hero-subtitle mt-3">
-                  Candidate: {student.name} | Status: {student.status} | Submit reason: {student.submitReason || 'manual'}
+                <p className="hero-subtitle mt-2">
+                  Candidate: {student.name} | Status: {student.status} | Submit: {student.submitReason || 'manual'}
                 </p>
               </div>
               <Link className="btn-primary" href="/">Return Home</Link>
             </div>
-            <div className="mt-4 grid gap-3 md:grid-cols-5">
+            <div className="mt-3 grid grid-cols-2 gap-2 md:grid-cols-5">
               <div className="stat-card">
                 <p className="section-kicker">Score</p>
-                <p className="mt-2 text-2xl font-semibold text-slate-900">{result.score}</p>
+                <p className="mt-1 text-xl font-semibold text-slate-900">{result.score}</p>
                 <p className="mt-1 text-xs text-slate-500">out of {result.maxScore}</p>
               </div>
               <div className="stat-card">
                 <p className="section-kicker">Correct</p>
-                <p className="mt-2 text-2xl font-semibold text-slate-900">{result.correctCount}</p>
+                <p className="mt-1 text-xl font-semibold text-slate-900">{result.correctCount}</p>
                 <p className="mt-1 text-xs text-slate-500">of {result.totalQuestions}</p>
               </div>
               <div className="stat-card">
                 <p className="section-kicker">Answered</p>
-                <p className="mt-2 text-2xl font-semibold text-slate-900">{result.answeredCount}</p>
+                <p className="mt-1 text-xl font-semibold text-slate-900">{result.answeredCount}</p>
                 <p className="mt-1 text-xs text-slate-500">responses recorded</p>
               </div>
               <div className="stat-card">
                 <p className="section-kicker">Skipped</p>
-                <p className="mt-2 text-2xl font-semibold text-slate-900">{result.skippedCount}</p>
+                <p className="mt-1 text-xl font-semibold text-slate-900">{result.skippedCount}</p>
                 <p className="mt-1 text-xs text-slate-500">marked skip or timed out</p>
               </div>
               <div className="stat-card">
                 <p className="section-kicker">Accuracy</p>
-                <p className="mt-2 text-2xl font-semibold text-slate-900">{result.accuracy}%</p>
+                <p className="mt-1 text-xl font-semibold text-slate-900">{result.accuracy}%</p>
                 <p className="mt-1 text-xs text-slate-500">based on total questions</p>
               </div>
             </div>

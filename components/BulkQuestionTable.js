@@ -105,9 +105,9 @@ export default function BulkQuestionTable({
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <div className="badge-blue">Bulk Edit Grid</div>
-          <h3 className="section-title mt-3 text-2xl">Organization-scale question editing</h3>
-          <p className="mt-2 text-sm text-slate-600">
-            Update every question in a single table, upload images, or hand off a row into the detailed editor.
+          <h3 className="section-title mt-2 text-xl">High-density question editing</h3>
+          <p className="mt-1 text-compact text-slate-600">
+            Update rows, upload images, or move one row into the detailed editor.
           </p>
         </div>
         <button className="btn-primary" onClick={saveAll} disabled={savingAll || !dirtyCount}>
@@ -117,35 +117,35 @@ export default function BulkQuestionTable({
 
       {message && <div className="glass-banner mt-4 text-sm text-slate-700">{message}</div>}
 
-      <div className="mt-5 overflow-x-auto">
-        <table className="min-w-[1200px] w-full text-sm">
+      <div className="mt-4 overflow-x-auto">
+        <table className="min-w-[1100px] w-full text-xs">
           <thead>
             <tr className="border-b border-[rgba(17,33,61,0.08)] text-left text-slate-500">
-              <th className="px-3 py-3 font-medium">Q</th>
-              <th className="px-3 py-3 font-medium">Question</th>
-              <th className="px-3 py-3 font-medium">Options</th>
-              <th className="px-3 py-3 font-medium">Answer</th>
-              <th className="px-3 py-3 font-medium">Time</th>
-              <th className="px-3 py-3 font-medium">Image</th>
-              <th className="px-3 py-3 font-medium">Actions</th>
+              <th className="px-2 py-2 font-medium">Q</th>
+              <th className="px-2 py-2 font-medium">Question</th>
+              <th className="px-2 py-2 font-medium">Options</th>
+              <th className="px-2 py-2 font-medium">Answer</th>
+              <th className="px-2 py-2 font-medium">Time</th>
+              <th className="px-2 py-2 font-medium">Image</th>
+              <th className="px-2 py-2 font-medium">Actions</th>
             </tr>
           </thead>
           <tbody>
             {rows.map((row, index) => (
               <tr key={row.id} className="border-b border-[rgba(17,33,61,0.06)] align-top">
-                <td className="px-3 py-4 font-semibold text-slate-900">{index + 1}</td>
-                <td className="px-3 py-3 min-w-[280px]">
+                <td className="px-2 py-3 font-semibold text-slate-900">{index + 1}</td>
+                <td className="min-w-[260px] px-2 py-2">
                   <textarea
-                    className="textarea min-h-[96px]"
+                    className="textarea min-h-[84px]"
                     value={row.question}
                     onChange={(event) => updateRow(row.id, { question: event.target.value })}
                   />
-                  <div className="mt-2 rounded-2xl bg-slate-50 px-3 py-2 text-slate-700">
+                  <div className="mt-2 rounded-xl bg-slate-50 px-2.5 py-2 text-slate-700">
                     <MathText text={row.question || 'Question preview'} />
                   </div>
                 </td>
-                <td className="px-3 py-3 min-w-[260px]">
-                  <div className="space-y-2">
+                <td className="min-w-[240px] px-2 py-2">
+                  <div className="space-y-1.5">
                     {['A', 'B', 'C', 'D'].map((key) => (
                       <div key={key}>
                         <input
@@ -158,7 +158,7 @@ export default function BulkQuestionTable({
                     ))}
                   </div>
                 </td>
-                <td className="px-3 py-3">
+                <td className="px-2 py-2">
                   <select className="input min-w-[90px]" value={row.answer} onChange={(event) => updateRow(row.id, { answer: event.target.value })}>
                     <option value="A">A</option>
                     <option value="B">B</option>
@@ -166,7 +166,7 @@ export default function BulkQuestionTable({
                     <option value="D">D</option>
                   </select>
                 </td>
-                <td className="px-3 py-3">
+                <td className="px-2 py-2">
                   <input
                     className="input min-w-[120px]"
                     type="number"
@@ -175,8 +175,8 @@ export default function BulkQuestionTable({
                     onChange={(event) => updateRow(row.id, { customTime: event.target.value })}
                   />
                 </td>
-                <td className="px-3 py-3 min-w-[220px]">
-                  <div className="space-y-2">
+                <td className="min-w-[210px] px-2 py-2">
+                  <div className="space-y-1.5">
                     <input className="input" value={row.image} placeholder="Image URL or uploaded data" onChange={(event) => updateRow(row.id, { image: event.target.value })} />
                     <input
                       className="input"
@@ -190,10 +190,10 @@ export default function BulkQuestionTable({
                         event.target.value = '';
                       }}
                     />
-                    {row.image && <img src={row.image} alt="Question" className="max-h-24 rounded-2xl object-contain" />}
+                    {row.image && <img src={row.image} alt="Question" className="max-h-20 rounded-xl object-contain" />}
                   </div>
                 </td>
-                <td className="px-3 py-3 min-w-[220px]">
+                <td className="min-w-[210px] px-2 py-2">
                   <div className="flex flex-col gap-2">
                     <button className="btn-primary" onClick={() => saveRow(row)} disabled={savingId === row.id}>
                       {savingId === row.id ? 'Saving...' : 'Save Row'}

@@ -125,10 +125,10 @@ export default function QuestionBuilder({
   const actionLabel = submitLabel || (mode === 'edit' ? 'Save Question' : 'Add Question');
 
   return (
-    <div className="space-y-4">
-      <div className="rounded-[20px] border border-[rgba(29,114,255,0.1)] bg-[rgba(29,114,255,0.04)] px-4 py-3 text-sm text-slate-600">
+    <div className="space-y-3">
+      <div className="rounded-[16px] border border-[rgba(29,114,255,0.1)] bg-[rgba(29,114,255,0.04)] px-3 py-2 text-xs text-slate-600">
         <p className="font-semibold text-slate-900">Math formula support</p>
-        <p className="mt-2">
+        <p className="mt-1.5">
           Use LaTeX-style syntax inside <code>$...$</code> for inline math or <code>$$...$$</code> for block formulas.
           Example: <code>{'$x^2 + y^2 = z^2$'}</code> or <code>{'$$\\frac{-b \\pm \\sqrt{b^2 - 4ac}}{2a}$$'}</code>
         </p>
@@ -154,7 +154,7 @@ export default function QuestionBuilder({
         <input className="input" placeholder="Image URL (optional)" value={form.image} onChange={handleChange('image')} />
         <input className="input" placeholder="Dedicated time in seconds" type="number" min="0" value={form.customTime} onChange={handleChange('customTime')} />
       </div>
-      <div className="grid gap-3 md:grid-cols-[1fr_auto]">
+      <div className="grid gap-2 md:grid-cols-[1fr_auto]">
         <input className="input" type="file" accept="image/*" onChange={handleImageUpload} disabled={imageUploading} />
         <button className="btn-outline" type="button" onClick={() => setForm((prev) => ({ ...prev, image: '' }))} disabled={!form.image}>
           Clear Image
@@ -162,24 +162,24 @@ export default function QuestionBuilder({
       </div>
       {imageUploading && <p className="text-sm text-slate-500">Uploading image...</p>}
       {form.image && (
-        <div className="rounded-[22px] border border-[rgba(17,33,61,0.08)] bg-slate-50 p-4">
+        <div className="rounded-[16px] border border-[rgba(17,33,61,0.08)] bg-slate-50 p-3">
           <p className="section-kicker">Image Preview</p>
-          <img src={form.image} alt="Question preview" className="mt-3 max-h-48 rounded-[18px] object-contain" />
+          <img src={form.image} alt="Question preview" className="mt-2 max-h-40 rounded-[14px] object-contain" />
         </div>
       )}
 
-      <div className="rounded-[22px] border border-[rgba(255,138,42,0.12)] bg-white/90 p-4">
+      <div className="rounded-[16px] border border-[rgba(255,138,42,0.12)] bg-white/90 p-3">
         <p className="section-kicker">Live Preview</p>
-        <div className="mt-4 space-y-3">
+        <div className="mt-3 space-y-2.5">
           <div>
             <p className="text-xs uppercase tracking-[0.2em] text-slate-400">Question</p>
-            <div className="mt-2 text-base text-slate-800">
+            <div className="mt-1.5 text-sm text-slate-800">
               <MathText text={form.question || 'Question preview will appear here.'} />
             </div>
           </div>
-          <div className="grid gap-3 md:grid-cols-2">
+          <div className="grid gap-2 md:grid-cols-2">
             {Object.entries(previewOptions).map(([key, value]) => (
-              <div key={key} className={`rounded-[20px] border px-4 py-3 text-sm ${form.answer === key ? 'border-[rgba(29,114,255,0.2)] bg-[rgba(29,114,255,0.08)]' : 'border-[rgba(17,33,61,0.08)] bg-slate-50'}`}>
+              <div key={key} className={`rounded-[14px] border px-3 py-2 text-xs ${form.answer === key ? 'border-[rgba(29,114,255,0.2)] bg-[rgba(29,114,255,0.08)]' : 'border-[rgba(17,33,61,0.08)] bg-slate-50'}`}>
                 <div className="font-semibold text-slate-900">{key}.</div>
                 <div className="mt-1 text-slate-700">
                   <MathText text={value || `Option ${key} preview`} />

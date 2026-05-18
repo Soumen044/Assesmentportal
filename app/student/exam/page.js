@@ -609,18 +609,18 @@ export default function ExamPage() {
 
   return (
     <main className="page-shell surface-grid">
-      <div className="page-wrap max-w-5xl">
-        <section className="space-y-4 fade-rise">
+      <div className="page-wrap max-w-4xl">
+        <section className="space-y-3 fade-rise">
           {state.fullscreenModalOpen && (
             <div className="fixed inset-0 z-50 flex items-center justify-center bg-[rgba(17,33,61,0.7)] px-4">
               <div className="card-strong max-w-xl">
                 <div className="badge-orange">Fullscreen Warning</div>
                 <h2 className="section-title mt-3 text-xl">You exited fullscreen.</h2>
-                <p className="mt-3 text-sm text-slate-600">
+                <p className="mt-2 text-xs text-slate-600">
                   This has been marked as a violation. If you do not return to fullscreen within {state.fullscreenCountdown} seconds,
                   your exam will be auto-submitted.
                 </p>
-                <div className="mt-6 flex flex-wrap gap-3">
+                <div className="mt-4 flex flex-wrap gap-2">
                   <button className="btn-primary" onClick={requestFullscreenRecovery}>Return to Fullscreen</button>
                   <button className="btn-accent" onClick={() => handleAutoSubmit('fullscreen-exit-confirmed')}>
                     Submit Now
@@ -630,16 +630,16 @@ export default function ExamPage() {
             </div>
           )}
 
-          <div className="card-strong">
-            <div className="flex flex-wrap items-center justify-between gap-4">
+          <div className="card-strong priority-actions">
+            <div className="flex flex-wrap items-center justify-between gap-2">
               <div>
                 <div className="badge-blue">Focused Exam Mode</div>
-                <h1 className="section-title mt-2 text-2xl">Question {state.currentIndex + 1} of {questions.length}</h1>
-                <p className="mt-1 text-xs text-slate-600">
+                <h1 className="section-title mt-1 text-base sm:text-lg">Question {state.currentIndex + 1} of {questions.length}</h1>
+                <p className="mt-1 text-[11px] text-slate-600">
                   Violations recorded: <span className="font-semibold text-slate-900">{state.violationCount}</span>
                 </p>
               </div>
-              <div className="flex flex-wrap gap-3">
+              <div className="flex flex-wrap gap-2">
                 {state.settings.enableQuestionTimer && <Timer label="Question" value={formatClock(currentQuestionTime)} />}
                 {state.settings.enableTotalTimer && <Timer label="Assessment" value={formatClock(state.totalRemaining)} />}
               </div>
@@ -647,23 +647,23 @@ export default function ExamPage() {
           </div>
 
           <div className="card-strong">
-            <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="flex flex-wrap items-center justify-between gap-2">
               <p className="section-kicker">Current Prompt</p>
               <span className="badge-orange">
                 {state.settings.enableQuestionTimer ? `${formatClock(currentQuestionTime)} for this question` : 'Per-question timer disabled'}
               </span>
             </div>
-            <div className="mt-3 text-xl font-semibold text-slate-900">
+            <div className="mt-2 text-base font-semibold leading-5 text-slate-900 sm:text-lg">
               <MathText text={currentQuestion.question} />
             </div>
             {currentQuestion.image && (
-              <img src={currentQuestion.image} alt="Question" className="mt-5 max-h-72 rounded-[24px] border border-[rgba(17,33,61,0.08)] object-contain p-3" />
+              <img src={currentQuestion.image} alt="Question" className="mt-3 max-h-52 rounded-[16px] border border-[rgba(17,33,61,0.08)] object-contain p-2" />
             )}
-            <div className="mt-6 grid gap-3 md:grid-cols-2">
+            <div className="mt-3 grid grid-cols-2 gap-2">
               {Object.entries(currentQuestion.options).map(([key, value]) => (
                 <button
                   key={key}
-                  className={`rounded-[20px] border px-4 py-3 text-left text-sm transition ${
+                  className={`min-h-[78px] rounded-[14px] border px-3 py-2 text-left text-xs leading-4 transition ${
                     currentAnswer.selectedOption === key
                       ? 'border-[rgba(29,114,255,0.28)] bg-[rgba(29,114,255,0.12)] text-blue-900'
                       : 'border-[rgba(17,33,61,0.08)] bg-white/80 text-slate-700 hover:border-[rgba(255,138,42,0.24)] hover:bg-[rgba(255,138,42,0.08)]'
@@ -675,17 +675,17 @@ export default function ExamPage() {
                 </button>
               ))}
             </div>
-            <label className="mt-4 flex items-center gap-3 rounded-2xl border border-[rgba(255,138,42,0.14)] bg-[rgba(255,138,42,0.08)] px-4 py-3 text-sm text-slate-700">
+            <label className="mt-3 flex items-center gap-2 rounded-xl border border-[rgba(255,138,42,0.14)] bg-[rgba(255,138,42,0.08)] px-3 py-2 text-xs text-slate-700">
               <input type="checkbox" checked={currentAnswer.skipped} onChange={(event) => toggleSkip(event.target.checked)} />
               Skip this question
             </label>
           </div>
 
-          <div className="space-y-3">
-            <div className="rounded-2xl border border-[rgba(29,114,255,0.12)] bg-[rgba(29,114,255,0.06)] px-4 py-3 text-sm font-medium text-slate-700">
+          <div className="space-y-2">
+            <div className="rounded-xl border border-[rgba(29,114,255,0.12)] bg-[rgba(29,114,255,0.06)] px-3 py-2 text-xs font-medium text-slate-700">
               Active timer: {buttonTimerText}
             </div>
-            <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="card priority-actions flex flex-wrap items-center justify-between gap-2 bg-white/95">
               <button className="btn-outline" onClick={handlePrev} disabled={state.currentIndex === 0}>Previous</button>
               {state.currentIndex < questions.length - 1 ? (
                 <button className="btn-primary" onClick={handleNext}>
@@ -699,7 +699,7 @@ export default function ExamPage() {
             </div>
           </div>
 
-          {state.message && <div className="glass-banner text-sm text-slate-700">{state.message}</div>}
+          {state.message && <div className="glass-banner text-xs text-slate-700">{state.message}</div>}
         </section>
       </div>
     </main>

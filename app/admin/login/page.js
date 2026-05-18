@@ -47,35 +47,15 @@ export default function AdminLoginPage() {
   return (
     <main className="page-shell surface-grid">
       <div className="page-wrap">
-        <section className="grid gap-6 lg:grid-cols-[1.05fr_0.95fr]">
-          <div className="card-strong fade-rise">
-            <div className="space-y-5">
-              <div className="badge-orange">Admin Access</div>
-              <h1 className="hero-title text-3xl md:text-5xl">Sign in to the command deck.</h1>
-              <p className="hero-subtitle">
-                Your admin flow uses password validation, CAPTCHA confirmation, and OTP before the dashboard unlocks.
-              </p>
-              <div className="grid gap-4 sm:grid-cols-2">
-                <div className="stat-card">
-                  <p className="section-kicker">Secure Layer 1</p>
-                  <p className="mt-2 font-semibold">Firestore-backed admin identity with bcrypt password hashes.</p>
-                </div>
-                <div className="stat-card">
-                  <p className="section-kicker">Secure Layer 2</p>
-                  <p className="mt-2 font-semibold">Email OTP confirmation before JWT session issuance.</p>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <div className="card fade-rise">
-            <h2 className="section-title text-2xl">{stage === 'login' ? 'Admin Login' : 'OTP Verification'}</h2>
-            <p className="mt-2 text-sm text-slate-500">
-              {stage === 'login' ? 'Enter your credentials to request a one-time passcode.' : 'Enter the OTP sent to your email.'}
+        <section className="grid gap-3 lg:grid-cols-[0.95fr_1.05fr]">
+          <div className="card order-1 fade-rise lg:order-2">
+            <h2 className="section-title text-xl">{stage === 'login' ? 'Admin Login' : 'OTP Verification'}</h2>
+            <p className="mt-1 text-compact text-slate-500">
+              {stage === 'login' ? 'Enter credentials and request OTP.' : 'Enter the OTP sent to your email.'}
             </p>
 
             {stage === 'login' && (
-              <div className="mt-6 space-y-4">
+              <div className="mt-4 space-y-3">
                 <div>
                   <label className="label">Username</label>
                   <input className="input" value={form.username} onChange={handleChange('username')} />
@@ -84,11 +64,11 @@ export default function AdminLoginPage() {
                   <label className="label">Password</label>
                   <input className="input" type="password" value={form.password} onChange={handleChange('password')} />
                 </div>
-                <label className="flex items-center gap-3 rounded-2xl border border-[rgba(29,114,255,0.12)] bg-[rgba(29,114,255,0.05)] px-4 py-3 text-sm text-slate-600">
+                <label className="flex items-center gap-2 rounded-xl border border-[rgba(29,114,255,0.12)] bg-[rgba(29,114,255,0.05)] px-3 py-2 text-xs text-slate-600">
                   <input type="checkbox" checked={form.captchaVerified} onChange={handleChange('captchaVerified')} />
                   CAPTCHA placeholder confirmed
                 </label>
-                {error && <p className="text-sm text-red-600">{error}</p>}
+                {error && <p className="text-xs text-red-600">{error}</p>}
                 <button className="btn-primary w-full" onClick={handleLogin} disabled={loading}>
                   {loading ? 'Sending OTP...' : 'Continue'}
                 </button>
@@ -96,20 +76,40 @@ export default function AdminLoginPage() {
             )}
 
             {stage === 'otp' && (
-              <div className="mt-6 space-y-4">
+              <div className="mt-4 space-y-3">
                 <div className="glass-banner">
-                  <p className="text-sm text-slate-600">OTP sent for <span className="font-semibold text-slate-900">{form.username}</span>.</p>
+                  <p className="text-xs text-slate-600">OTP sent for <span className="font-semibold text-slate-900">{form.username}</span>.</p>
                 </div>
                 <div>
                   <label className="label">One-Time Password</label>
                   <input className="input" value={otp} onChange={(event) => setOtp(event.target.value)} />
                 </div>
-                {error && <p className="text-sm text-red-600">{error}</p>}
+                {error && <p className="text-xs text-red-600">{error}</p>}
                 <button className="btn-accent w-full" onClick={handleVerifyOtp} disabled={loading}>
                   {loading ? 'Verifying...' : 'Unlock Dashboard'}
                 </button>
               </div>
             )}
+          </div>
+
+          <div className="card-strong order-2 fade-rise lg:order-1">
+            <div className="space-y-4">
+              <div className="badge-orange">Admin Access</div>
+              <h1 className="hero-title text-2xl md:text-4xl">Sign in fast.</h1>
+              <p className="hero-subtitle">
+                Password, CAPTCHA confirmation, and OTP keep access locked without making the screen tall.
+              </p>
+              <div className="grid gap-2 sm:grid-cols-2">
+                <div className="stat-card">
+                  <p className="section-kicker">Secure Layer 1</p>
+                  <p className="mt-2 text-sm font-semibold">Stored admin identity and password hash validation.</p>
+                </div>
+                <div className="stat-card">
+                  <p className="section-kicker">Secure Layer 2</p>
+                  <p className="mt-2 text-sm font-semibold">Email OTP before the dashboard opens.</p>
+                </div>
+              </div>
+            </div>
           </div>
         </section>
       </div>
