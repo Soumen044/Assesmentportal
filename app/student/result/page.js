@@ -5,6 +5,16 @@ import Link from 'next/link';
 import api from '../../../lib/api';
 import MathText from '../../../components/MathText';
 
+function formatReviewStatus(item) {
+  if (item.status === 'skipped') {
+    return item.timedOut ? 'Skipped by timeout' : 'Skipped';
+  }
+  if (item.status === 'answered') {
+    return item.selectedAnswer || 'Answered';
+  }
+  return 'Not answered';
+}
+
 export default function StudentResultPage() {
   const [resultPayload, setResultPayload] = useState(null);
   const [message, setMessage] = useState('Loading your result...');
@@ -158,7 +168,7 @@ export default function StudentResultPage() {
                     <div className="mt-3 grid gap-2 md:grid-cols-3">
                       <div className="stat-card">
                         <p className="section-kicker">Your Answer</p>
-                        <p className="mt-2 text-sm font-semibold text-slate-900">{item.skipped ? 'Skipped' : (item.selectedAnswer || 'Not answered')}</p>
+                        <p className="mt-2 text-sm font-semibold text-slate-900">{formatReviewStatus(item)}</p>
                       </div>
                       <div className="stat-card">
                         <p className="section-kicker">Correct Answer</p>

@@ -36,7 +36,7 @@ export default function LivePage() {
   const [message, setMessage] = useState('');
   const [stopping, setStopping] = useState(false);
   const [exportingPdf, setExportingPdf] = useState(false);
-  const [tab, setTab] = useState('overview');
+  const [tab, setTab] = useState('rosters');
 
   useEffect(() => {
     const loadSessions = async () => {
@@ -97,6 +97,7 @@ export default function LivePage() {
   const selectedSession = sessions.find((item) => item.sessionId === sessionId);
   const activeStudentCount = liveRoster.length;
   const waitingStudentCount = waitingRoster.length;
+  const joinedStudentCount = waitingStudentCount + activeStudentCount;
   const totalLiveScore = liveRoster.reduce((sum, student) => sum + Number(student.score || 0), 0);
   const highestScore = liveRoster.reduce((max, student) => Math.max(max, Number(student.score || 0)), 0);
   const sessionDate = useMemo(() => formatDateTime(sessionMeta?.createdAt || selectedSession?.createdAt), [selectedSession?.createdAt, sessionMeta?.createdAt]);
@@ -158,7 +159,7 @@ export default function LivePage() {
             <div className="card-strong">
               <div className="badge-orange">Live Assessments</div>
               <h1 className="section-title mt-2">Active session monitor</h1>
-              <p className="mt-2 text-sm text-slate-600">Select any active session to inspect live status, dates, roster counts, and the running scoreboard.</p>
+              <p className="mt-2 text-compact text-slate-600">Pick a session and keep the waiting and live rosters visible without leaving this screen.</p>
             </div>
 
             <div className="card">
@@ -166,7 +167,7 @@ export default function LivePage() {
               <input className="input" value={sessionId} onChange={(event) => setSessionId(event.target.value)} placeholder="Enter or pick an active session ID" />
             </div>
 
-            <div className="compact-stack">
+            <div className="grid gap-2">
               {sessions.map((session) => (
                 <button
                   key={session.sessionId}
@@ -178,13 +179,9 @@ export default function LivePage() {
                       <p className="truncate font-semibold text-slate-900">{session.name}</p>
                       <p className="mt-1 text-xs text-slate-500">Session ID: {session.sessionId}</p>
                     </div>
-                    <span className="badge-blue">{session.studentCount || 0} participants</span>
+                    <span className="badge-blue">{session.studentCount || 0} joined</span>
                   </div>
                   <div className="mt-3 grid gap-2 sm:grid-cols-4">
-                    <div className="stat-card">
-                      <p className="section-kicker">Password</p>
-                      <p className="mt-2 break-all text-xs font-semibold tracking-[0.1em]">{session.password}</p>
-                    </div>
                     <div className="stat-card">
                       <p className="section-kicker">Questions</p>
                       <p className="mt-2 text-sm font-semibold">{session.questionCount || 0}</p>
@@ -196,6 +193,10 @@ export default function LivePage() {
                     <div className="stat-card">
                       <p className="section-kicker">Status</p>
                       <p className="mt-2 text-xs font-semibold uppercase tracking-[0.14em]">{session.status}</p>
+                    </div>
+                    <div className="stat-card">
+                      <p className="section-kicker">Password</p>
+                      <p className="mt-2 break-all text-xs font-semibold tracking-[0.1em]">{session.password}</p>
                     </div>
                   </div>
                 </button>
@@ -211,11 +212,14 @@ export default function LivePage() {
                   <p className="section-kicker">Selected Session</p>
                   <h2 className="section-title mt-1">{selectedSession ? selectedSession.name : 'Waiting for a session selection'}</h2>
                 </div>
-                <span className="badge-orange">{activeStudentCount} live</span>
+                <div className="flex flex-wrap gap-2">
+                  <span className="badge-blue">{waitingStudentCount} waiting</span>
+                  <span className="badge-orange">{activeStudentCount} live</span>
+                </div>
               </div>
               {selectedSession && (
                 <>
-                  <div className="mt-4 grid gap-3 md:grid-cols-5">
+                  <div className="mt-4 grid gap-3 md:grid-cols-6">
                     <div className="stat-card">
                       <p className="section-kicker">Session ID</p>
                       <p className="mt-2 text-sm font-semibold">{selectedSession.sessionId}</p>
@@ -235,6 +239,10 @@ export default function LivePage() {
                     <div className="stat-card">
                       <p className="section-kicker">Session Date</p>
                       <p className="mt-2 text-xs font-semibold">{sessionDate}</p>
+                    </div>
+                    <div className="stat-card">
+                      <p className="section-kicker">Joined</p>
+                      <p className="mt-2 text-sm font-semibold">{joinedStudentCount}</p>
                     </div>
                   </div>
                   <div className="mt-4 flex flex-wrap gap-2">
@@ -290,14 +298,20 @@ export default function LivePage() {
                       <p className="section-kicker">Waiting Room Roster</p>
                       <span className="badge-blue">{waitingRoster.length} waiting</span>
                     </div>
-                    <LiveStudentList data={Object.fromEntries(waitingRoster.map((student) => [student.studentId, student]))} />
+                    <LiveStudentList
+                      data={Object.fromEntries(waitingRoster.map((student) => [student.studentId, student]))}
+                      emptyMessage="No waiting candidates yet."
+                    />
                   </div>
                   <div>
                     <div className="mb-3 flex items-center justify-between">
                       <p className="section-kicker">Live Exam Roster</p>
                       <span className="badge-orange">{liveRoster.length} active</span>
                     </div>
-                    <LiveStudentList data={Object.fromEntries(liveRoster.map((student) => [student.studentId, student]))} />
+                    <LiveStudentList
+                      data={Object.fromEntries(liveRoster.map((student) => [student.studentId, student]))}
+                      emptyMessage="No live candidates yet."
+                    />
                   </div>
                 </div>
               )}

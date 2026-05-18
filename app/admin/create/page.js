@@ -45,12 +45,11 @@ function computePreviewDuration(questions, settings) {
 
 function computeRuntimeSummary(questions, settings) {
   const questionSum = computePreviewDuration(questions, settings);
-  const totalConfigured = Number(settings.totalTime || 0);
   return {
     questionSum,
-    totalConfigured,
-    minRuntime: settings.enableTotalTimer && settings.enableQuestionTimer ? Math.min(questionSum, totalConfigured || questionSum) : (settings.enableTotalTimer ? totalConfigured : questionSum),
-    maxRuntime: settings.enableTotalTimer && settings.enableQuestionTimer ? Math.max(questionSum, totalConfigured) : (settings.enableTotalTimer ? totalConfigured : questionSum)
+    totalConfigured: questionSum,
+    minRuntime: questionSum,
+    maxRuntime: questionSum
   };
 }
 
@@ -78,6 +77,15 @@ export default function CreateAssessmentPage() {
   const sampleTemplateUrl = `${process.env.NEXT_PUBLIC_API_BASE_URL || ''}/api/assessments/sample-template`;
   const totalPreviewTime = useMemo(() => computePreviewDuration(questions, settings), [questions, settings]);
   const runtimeSummary = useMemo(() => computeRuntimeSummary(questions, settings), [questions, settings]);
+
+  const updateQuestionTime = (questionId, value) => {
+    const normalized = Math.max(0, Number(value || 0));
+    setQuestions((current) => current.map((question) => (
+      question.id === questionId
+        ? { ...question, customTime: normalized }
+        : question
+    )));
+  };
 
   useEffect(() => {
     if (!sessionReady) {
@@ -236,8 +244,21 @@ export default function CreateAssessmentPage() {
     setLoading(true);
     setMessage('');
     try {
-      const response = await api.put(`/api/assessments/${session.sessionId}/settings`, settings);
-      setSettings(response.data.settings || settings);
+      const nextSettings = {
+        ...settings,
+        totalTime: settings.enableTotalTimer ? runtimeSummary.questionSum : 0
+      };
+      const [timingResponse, settingsResponse] = await Promise.all([
+        api.put(`/api/assessments/${session.sessionId}/question-timings`, {
+          timings: questions.map((question) => ({
+            id: question.id,
+            customTime: Number(question.customTime || 0)
+          }))
+        }),
+        api.put(`/api/assessments/${session.sessionId}/settings`, nextSettings)
+      ]);
+      setQuestions(timingResponse.data.questions || questions);
+      setSettings(settingsResponse.data.settings || nextSettings);
       setMessage('Timing configuration saved. Review the full preview before opening the waiting room.');
       setStep(3);
     } catch (err) {
@@ -378,7 +399,7 @@ export default function CreateAssessmentPage() {
                     <a className="btn-outline" href={sampleTemplateUrl} target="_blank" rel="noreferrer">Download Sample .xlsx</a>
                   </div>
 
-                    <div className="mt-3 panel-tabs">
+                  <div className="priority-actions mt-3 panel-tabs rounded-[16px] bg-[rgba(255,247,237,0.92)] p-1">
                     {[
                       ['manual', editingQuestion ? 'Edit Builder' : 'Manual Builder'],
                       ['preview', `Question Preview (${questions.length})`],
@@ -396,6 +417,7 @@ export default function CreateAssessmentPage() {
                         <div className="table-shell p-3">
                           <label className="label">Upload Question Sheet</label>
                           <input className="input" type="file" accept=".xlsx,.xls" onChange={handleUpload} disabled={!sessionReady || loading} />
+                          <p className="mt-2 text-compact text-slate-500">Template includes question, options, answer, and image only. Timing is set later in the timing step.</p>
                         </div>
                         <div className="table-shell p-3">
                           <p className="section-kicker">Manual Builder</p>
@@ -427,8 +449,8 @@ export default function CreateAssessmentPage() {
                             <p className="mt-2 text-compact text-slate-600">Question add, update, duplicate, and delete now reuse the returned payload instead of refetching the whole screen.</p>
                           </div>
                           <div className="stat-card">
-                            <p className="section-kicker">Compact Containers</p>
-                            <p className="mt-2 text-compact text-slate-600">Long prompts and options wrap inside cards, keeping text inside each border.</p>
+                            <p className="section-kicker">Timing Flow</p>
+                            <p className="mt-2 text-compact text-slate-600">Question timing is managed only in the timing step, not during authoring or import.</p>
                           </div>
                         </div>
                       </div>
@@ -453,9 +475,6 @@ export default function CreateAssessmentPage() {
                               <div className="mt-1 content-safe text-sm text-slate-800">
                                 <MathText text={question.question} />
                               </div>
-                              <p className="mt-1 text-xs text-slate-500">
-                                Time: {question.customTime ? `${question.customTime}s dedicated` : `${settings.defaultQuestionTime || 60}s default`}
-                              </p>
                             </div>
                             <div className="flex flex-wrap gap-2">
                               <button className="btn-ghost" onClick={() => {
@@ -511,7 +530,7 @@ export default function CreateAssessmentPage() {
               <div className="card-strong fade-rise">
                 <div className="badge-orange">Step 3</div>
                 <h2 className="section-title mt-2">Timing and behavior settings</h2>
-                <p className="mt-2 text-sm text-slate-600">Keep timer controls compact while still exposing the full timing map.</p>
+                <p className="mt-2 text-sm text-slate-600">All timing is controlled here. Set one default value, then override only the questions that need different timing.</p>
 
                 <div className="mt-3 grid grid-cols-2 gap-2 md:grid-cols-3">
                   <div className="stat-card">
@@ -520,7 +539,7 @@ export default function CreateAssessmentPage() {
                   </div>
                   <div className="stat-card">
                     <p className="section-kicker">Total Timer</p>
-                    <p className="mt-2 text-sm font-semibold">{settings.enableTotalTimer ? formatSeconds(settings.totalTime) : 'Disabled'}</p>
+                    <p className="mt-2 text-sm font-semibold">{settings.enableTotalTimer ? formatSeconds(runtimeSummary.questionSum) : 'Disabled'}</p>
                   </div>
                   <div className="stat-card">
                     <p className="section-kicker">Question Timer</p>
@@ -550,7 +569,8 @@ export default function CreateAssessmentPage() {
                       <input type="checkbox" checked={settings.enableTotalTimer} onChange={(event) => setSettings((prev) => ({ ...prev, enableTotalTimer: event.target.checked }))} />
                       Enforce an overall countdown
                     </label>
-                    <input className="input mt-3" type="number" min="30" value={settings.totalTime} onChange={(event) => setSettings((prev) => ({ ...prev, totalTime: event.target.value }))} disabled={!settings.enableTotalTimer} />
+                    <input className="input mt-3" value={settings.enableTotalTimer ? formatSeconds(runtimeSummary.questionSum) : 'Disabled'} disabled />
+                    <p className="mt-2 text-compact text-slate-500">This is auto-calculated from the default question time plus per-question overrides.</p>
                   </div>
                   <div className="table-shell p-3">
                     <label className="label">Per-Question Timer</label>
@@ -591,7 +611,7 @@ export default function CreateAssessmentPage() {
                         <th className="px-2 py-2 font-medium">Q</th>
                         <th className="px-2 py-2 font-medium">Prompt</th>
                         <th className="px-2 py-2 font-medium">Timer</th>
-                        <th className="px-2 py-2 font-medium">Source</th>
+                        <th className="px-2 py-2 font-medium">Override</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -603,7 +623,15 @@ export default function CreateAssessmentPage() {
                             {settings.enableQuestionTimer ? formatSeconds(question.customTime || settings.defaultQuestionTime) : 'No per-question timer'}
                           </td>
                           <td className="px-2 py-2 text-slate-600">
-                            {question.customTime ? 'Dedicated question timer' : settings.enableQuestionTimer ? 'Default question timer' : settings.enableTotalTimer ? 'Assessment timer only' : 'No timer'}
+                            <input
+                              className="input min-w-[110px]"
+                              type="number"
+                              min="0"
+                              value={question.customTime || ''}
+                              onChange={(event) => updateQuestionTime(question.id, event.target.value)}
+                              disabled={!settings.enableQuestionTimer}
+                              placeholder={`${settings.defaultQuestionTime}`}
+                            />
                           </td>
                         </tr>
                       ))}
@@ -666,7 +694,7 @@ export default function CreateAssessmentPage() {
                                 <MathText text={question.question} />
                               </div>
                               <p className="mt-1 text-xs text-slate-500">
-                                Time guideline: {question.customTime ? `${question.customTime}s dedicated` : settings.enableQuestionTimer ? `${settings.defaultQuestionTime}s default` : settings.enableTotalTimer ? 'Uses total exam timer only' : 'No timer configured'}
+                                Time guideline: {settings.enableQuestionTimer ? formatSeconds(question.customTime || settings.defaultQuestionTime) : settings.enableTotalTimer ? formatSeconds(runtimeSummary.questionSum) : 'No timer configured'}
                               </p>
                             </div>
                             <span className="badge-slate">Answer {question.answer}</span>

@@ -11,8 +11,7 @@ const emptyForm = {
   C: '',
   D: '',
   answer: 'A',
-  image: '',
-  customTime: ''
+  image: ''
 };
 
 function createFormState(initialValues) {
@@ -27,8 +26,7 @@ function createFormState(initialValues) {
     C: initialValues.options?.C || '',
     D: initialValues.options?.D || '',
     answer: initialValues.answer || 'A',
-    image: initialValues.image || '',
-    customTime: initialValues.customTime ? String(initialValues.customTime) : ''
+    image: initialValues.image || ''
   };
 }
 
@@ -97,8 +95,7 @@ export default function QuestionBuilder({
       question: form.question,
       options: previewOptions,
       answer: form.answer,
-      image: form.image,
-      customTime: Number(form.customTime || 0)
+      image: form.image
     };
 
     try {
@@ -125,7 +122,24 @@ export default function QuestionBuilder({
   const actionLabel = submitLabel || (mode === 'edit' ? 'Save Question' : 'Add Question');
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-2">
+      <div className="sticky top-2 z-10 flex flex-wrap items-center justify-between gap-2 rounded-[16px] border border-[rgba(29,114,255,0.12)] bg-[rgba(255,255,255,0.96)] px-3 py-2 shadow-[0_12px_30px_rgba(17,33,61,0.06)] backdrop-blur">
+        <div className="min-w-0">
+          <p className="section-kicker">{mode === 'edit' ? 'Editing Question' : 'Manual Builder'}</p>
+          <p className="mt-1 text-compact text-slate-500">Keep the main actions pinned while you write, preview, and save.</p>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <button className="btn-primary" onClick={handleSubmit} disabled={loading}>
+            {loading ? (mode === 'edit' ? 'Saving...' : 'Adding...') : actionLabel}
+          </button>
+          {mode === 'edit' && onCancel && (
+            <button className="btn-outline" onClick={onCancel} disabled={loading}>
+              Cancel
+            </button>
+          )}
+        </div>
+      </div>
+
       <div className="rounded-[16px] border border-[rgba(29,114,255,0.1)] bg-[rgba(29,114,255,0.04)] px-3 py-2 text-xs text-slate-600">
         <p className="font-semibold text-slate-900">Math formula support</p>
         <p className="mt-1.5">
@@ -138,13 +152,13 @@ export default function QuestionBuilder({
         <label className="label">Question</label>
         <textarea className="textarea" placeholder="Write the full question prompt" value={form.question} onChange={handleChange('question')} />
       </div>
-      <div className="grid gap-3 md:grid-cols-2">
+      <div className="grid gap-2 md:grid-cols-2">
         <input className="input" placeholder="Option A" value={form.A} onChange={handleChange('A')} />
         <input className="input" placeholder="Option B" value={form.B} onChange={handleChange('B')} />
         <input className="input" placeholder="Option C" value={form.C} onChange={handleChange('C')} />
         <input className="input" placeholder="Option D" value={form.D} onChange={handleChange('D')} />
       </div>
-      <div className="grid gap-3 md:grid-cols-3">
+      <div className="grid gap-2 md:grid-cols-2">
         <select className="input" value={form.answer} onChange={handleChange('answer')}>
           <option value="A">Answer A</option>
           <option value="B">Answer B</option>
@@ -152,7 +166,6 @@ export default function QuestionBuilder({
           <option value="D">Answer D</option>
         </select>
         <input className="input" placeholder="Image URL (optional)" value={form.image} onChange={handleChange('image')} />
-        <input className="input" placeholder="Dedicated time in seconds" type="number" min="0" value={form.customTime} onChange={handleChange('customTime')} />
       </div>
       <div className="grid gap-2 md:grid-cols-[1fr_auto]">
         <input className="input" type="file" accept="image/*" onChange={handleImageUpload} disabled={imageUploading} />
@@ -190,7 +203,7 @@ export default function QuestionBuilder({
         </div>
       </div>
 
-      {message && <p className="text-sm text-slate-500">{message}</p>}
+      {message && <p className="text-xs text-slate-500">{message}</p>}
       <div className="flex flex-wrap gap-3">
         <button className="btn-primary" onClick={handleSubmit} disabled={loading}>
           {loading ? (mode === 'edit' ? 'Saving...' : 'Adding...') : actionLabel}

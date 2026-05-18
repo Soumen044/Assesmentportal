@@ -13,9 +13,13 @@ function mapQuestionToRow(question) {
     C: question.options?.C || '',
     D: question.options?.D || '',
     answer: question.answer || 'A',
-    customTime: question.customTime ? String(question.customTime) : '',
     image: question.image || ''
   };
+}
+
+function isRowDirty(row, question) {
+  const baseline = mapQuestionToRow(question || {});
+  return ['question', 'A', 'B', 'C', 'D', 'answer', 'image'].some((field) => row[field] !== baseline[field]);
 }
 
 export default function BulkQuestionTable({
@@ -35,7 +39,10 @@ export default function BulkQuestionTable({
     setRows((questions || []).map(mapQuestionToRow));
   }, [questions]);
 
-  const dirtyCount = useMemo(() => rows.length, [rows]);
+  const dirtyCount = useMemo(() => rows.reduce((count, row) => {
+    const original = questions.find((question) => question.id === row.id);
+    return count + (isRowDirty(row, original) ? 1 : 0);
+  }, 0), [questions, rows]);
 
   const updateRow = (questionId, updates) => {
     setRows((current) => current.map((row) => (row.id === questionId ? { ...row, ...updates } : row)));
@@ -49,7 +56,6 @@ export default function BulkQuestionTable({
         question: row.question,
         options: { A: row.A, B: row.B, C: row.C, D: row.D },
         answer: row.answer,
-        customTime: Number(row.customTime || 0),
         image: row.image || ''
       });
       setMessage(`Saved Q${rows.findIndex((item) => item.id === row.id) + 1}.`);
@@ -72,7 +78,6 @@ export default function BulkQuestionTable({
           question: row.question,
           options: { A: row.A, B: row.B, C: row.C, D: row.D },
           answer: row.answer,
-          customTime: Number(row.customTime || 0),
           image: row.image || ''
         });
         latestQuestions = response.data.questions || latestQuestions;
@@ -102,30 +107,32 @@ export default function BulkQuestionTable({
 
   return (
     <div className="card-strong">
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        <div>
+      <div className="sticky top-2 z-10 flex flex-wrap items-start justify-between gap-3 rounded-[16px] bg-[rgba(255,247,237,0.96)] pb-2">
+        <div className="min-w-0">
           <div className="badge-blue">Bulk Edit Grid</div>
-          <h3 className="section-title mt-2 text-xl">High-density question editing</h3>
+          <h3 className="section-title mt-2">High-density question editing</h3>
           <p className="mt-1 text-compact text-slate-600">
-            Update rows, upload images, or move one row into the detailed editor.
+            Update rows inline, keep actions at the top, and save only when changes exist.
           </p>
         </div>
-        <button className="btn-primary" onClick={saveAll} disabled={savingAll || !dirtyCount}>
-          {savingAll ? 'Saving All...' : 'Save All Rows'}
-        </button>
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="badge-slate">{dirtyCount} changed</span>
+          <button className="btn-primary" onClick={saveAll} disabled={savingAll || !dirtyCount}>
+            {savingAll ? 'Saving All...' : 'Save All Rows'}
+          </button>
+        </div>
       </div>
 
       {message && <div className="glass-banner mt-4 text-sm text-slate-700">{message}</div>}
 
-      <div className="mt-4 overflow-x-auto">
-        <table className="min-w-[1100px] w-full text-xs">
-          <thead>
+      <div className="mt-4 overflow-x-auto compact-scroll">
+        <table className="min-w-[980px] w-full text-xs">
+          <thead className="sticky top-16 z-10 bg-[rgba(255,255,255,0.98)] backdrop-blur">
             <tr className="border-b border-[rgba(17,33,61,0.08)] text-left text-slate-500">
               <th className="px-2 py-2 font-medium">Q</th>
               <th className="px-2 py-2 font-medium">Question</th>
               <th className="px-2 py-2 font-medium">Options</th>
               <th className="px-2 py-2 font-medium">Answer</th>
-              <th className="px-2 py-2 font-medium">Time</th>
               <th className="px-2 py-2 font-medium">Image</th>
               <th className="px-2 py-2 font-medium">Actions</th>
             </tr>
@@ -136,7 +143,7 @@ export default function BulkQuestionTable({
                 <td className="px-2 py-3 font-semibold text-slate-900">{index + 1}</td>
                 <td className="min-w-[260px] px-2 py-2">
                   <textarea
-                    className="textarea min-h-[84px]"
+                    className="textarea min-h-[72px]"
                     value={row.question}
                     onChange={(event) => updateRow(row.id, { question: event.target.value })}
                   />
@@ -166,15 +173,6 @@ export default function BulkQuestionTable({
                     <option value="D">D</option>
                   </select>
                 </td>
-                <td className="px-2 py-2">
-                  <input
-                    className="input min-w-[120px]"
-                    type="number"
-                    min="0"
-                    value={row.customTime}
-                    onChange={(event) => updateRow(row.id, { customTime: event.target.value })}
-                  />
-                </td>
                 <td className="min-w-[210px] px-2 py-2">
                   <div className="space-y-1.5">
                     <input className="input" value={row.image} placeholder="Image URL or uploaded data" onChange={(event) => updateRow(row.id, { image: event.target.value })} />
@@ -195,7 +193,7 @@ export default function BulkQuestionTable({
                 </td>
                 <td className="min-w-[210px] px-2 py-2">
                   <div className="flex flex-col gap-2">
-                    <button className="btn-primary" onClick={() => saveRow(row)} disabled={savingId === row.id}>
+                    <button className="btn-primary" onClick={() => saveRow(row)} disabled={savingId === row.id || !isRowDirty(row, questions.find((item) => item.id === row.id))}>
                       {savingId === row.id ? 'Saving...' : 'Save Row'}
                     </button>
                     <button className="btn-outline" onClick={() => onEdit?.(questions.find((item) => item.id === row.id) || null)}>
@@ -209,7 +207,7 @@ export default function BulkQuestionTable({
             ))}
             {!rows.length && (
               <tr>
-                <td className="px-3 py-4 text-slate-500" colSpan={7}>No questions yet.</td>
+                <td className="px-3 py-4 text-slate-500" colSpan={6}>No questions yet.</td>
               </tr>
             )}
           </tbody>

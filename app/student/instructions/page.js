@@ -152,6 +152,7 @@ export default function InstructionsPage() {
 
   const sessionSettings = sessionMeta?.settings || {};
   const isLive = runtime?.session?.status === 'live';
+  const rosterParticipants = runtime?.roster?.participants || [];
 
   return (
     <main className="page-shell surface-grid">
@@ -168,7 +169,39 @@ export default function InstructionsPage() {
                 <p className="section-kicker">Violations</p>
                 <p className="mt-1 text-base font-semibold text-slate-900">{runtime?.violationCount ?? 0}</p>
               </div>
+              <div className="stat-card">
+                <p className="section-kicker">Joined</p>
+                <p className="mt-1 text-base font-semibold text-slate-900">{runtime?.roster?.joinedCount ?? 0}</p>
+              </div>
+              <div className="stat-card">
+                <p className="section-kicker">Waiting</p>
+                <p className="mt-1 text-base font-semibold text-slate-900">{runtime?.roster?.waitingCount ?? 0}</p>
+              </div>
+              <div className="stat-card">
+                <p className="section-kicker">Live</p>
+                <p className="mt-1 text-base font-semibold text-slate-900">{runtime?.roster?.liveCount ?? 0}</p>
+              </div>
             </div>
+
+            {!!rosterParticipants.length && (
+              <div className="mt-3">
+                <div className="flex items-center justify-between gap-2">
+                  <p className="section-kicker">Joined Candidates</p>
+                  <span className="badge-blue">{runtime?.roster?.joinedCount ?? rosterParticipants.length}</span>
+                </div>
+                <div className="mt-2 flex gap-2 overflow-x-auto pb-1">
+                  {rosterParticipants.map((participant) => (
+                    <div
+                      key={participant.studentId}
+                      className="min-w-[132px] rounded-xl border border-[rgba(17,33,61,0.08)] bg-white/90 px-2.5 py-2 text-[11px] text-slate-700"
+                    >
+                      <p className="truncate font-semibold text-slate-900">{participant.name}</p>
+                      <p className="mt-1 uppercase tracking-[0.16em] text-slate-400">{participant.status}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
 
             {!isLive && (
               <div className="mt-3 rounded-[16px] border border-[rgba(29,114,255,0.14)] bg-[rgba(29,114,255,0.06)] px-3 py-2 text-xs text-slate-700">

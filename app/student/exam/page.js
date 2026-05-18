@@ -588,7 +588,7 @@ export default function ExamPage() {
     const questionClock = state.settings.enableQuestionTimer ? formatClock(currentQuestionTime) : null;
     const totalClock = state.settings.enableTotalTimer ? formatClock(state.totalRemaining) : null;
     if (questionClock && totalClock) {
-      return `${questionClock} question · ${totalClock} left`;
+      return `${questionClock} question / ${totalClock} left`;
     }
     if (questionClock) {
       return questionClock;
@@ -688,12 +688,12 @@ export default function ExamPage() {
             <div className="card priority-actions flex flex-wrap items-center justify-between gap-2 bg-white/95">
               <button className="btn-outline" onClick={handlePrev} disabled={state.currentIndex === 0}>Previous</button>
               {state.currentIndex < questions.length - 1 ? (
-                <button className="btn-primary" onClick={handleNext}>
-                  {(currentAnswer.skipped ? 'Skip and Next' : 'Save and Next')} · {buttonTimerText}
+                <button className="btn-primary" onClick={handleNext} disabled={!canAdvance}>
+                  {(currentAnswer.skipped ? 'Skip and Next' : 'Save and Next')} | {buttonTimerText}
                 </button>
               ) : (
-                <button className="btn-accent" onClick={handleManualSubmit}>
-                  {(currentAnswer.skipped ? 'Submit with Skip' : 'Submit Exam')} · {buttonTimerText}
+                <button className={canAdvance ? 'btn-primary' : 'btn-outline'} onClick={handleManualSubmit} disabled={!canAdvance}>
+                  {(currentAnswer.skipped ? 'Submit with Skip' : 'Submit Exam')} | {buttonTimerText}
                 </button>
               )}
             </div>
