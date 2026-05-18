@@ -157,29 +157,29 @@ export default function InstructionsPage() {
   return (
     <main className="page-shell surface-grid">
       <div className="page-wrap">
-        <section className="grid gap-3 lg:grid-cols-[0.98fr_1.02fr] fade-rise">
+        <section className="grid gap-2.5 lg:grid-cols-[0.98fr_1.02fr] fade-rise">
           <div className="card order-1 lg:order-2">
             <div className="badge-orange">Candidate Checklist</div>
             <div className="mt-3 grid grid-cols-2 gap-2">
               <div className="stat-card">
                 <p className="section-kicker">Resume Count</p>
-                <p className="mt-1 text-base font-semibold text-slate-900">{runtime?.student?.resumeCount ?? 0}</p>
+                <p className="mt-1 value-fit font-semibold text-slate-900">{runtime?.student?.resumeCount ?? 0}</p>
               </div>
               <div className="stat-card">
                 <p className="section-kicker">Violations</p>
-                <p className="mt-1 text-base font-semibold text-slate-900">{runtime?.violationCount ?? 0}</p>
+                <p className="mt-1 value-fit font-semibold text-slate-900">{runtime?.violationCount ?? 0}</p>
               </div>
               <div className="stat-card">
                 <p className="section-kicker">Joined</p>
-                <p className="mt-1 text-base font-semibold text-slate-900">{runtime?.roster?.joinedCount ?? 0}</p>
+                <p className="mt-1 value-fit font-semibold text-slate-900">{runtime?.roster?.joinedCount ?? 0}</p>
               </div>
               <div className="stat-card">
                 <p className="section-kicker">Waiting</p>
-                <p className="mt-1 text-base font-semibold text-slate-900">{runtime?.roster?.waitingCount ?? 0}</p>
+                <p className="mt-1 value-fit font-semibold text-slate-900">{runtime?.roster?.waitingCount ?? 0}</p>
               </div>
               <div className="stat-card">
                 <p className="section-kicker">Live</p>
-                <p className="mt-1 text-base font-semibold text-slate-900">{runtime?.roster?.liveCount ?? 0}</p>
+                <p className="mt-1 value-fit font-semibold text-slate-900">{runtime?.roster?.liveCount ?? 0}</p>
               </div>
             </div>
 
@@ -189,13 +189,13 @@ export default function InstructionsPage() {
                   <p className="section-kicker">Joined Candidates</p>
                   <span className="badge-blue">{runtime?.roster?.joinedCount ?? rosterParticipants.length}</span>
                 </div>
-                <div className="mt-2 flex gap-2 overflow-x-auto pb-1">
+                <div className="mt-2 flex gap-1.5 overflow-x-auto pb-1">
                   {rosterParticipants.map((participant) => (
                     <div
                       key={participant.studentId}
-                      className="min-w-[132px] rounded-xl border border-[rgba(17,33,61,0.08)] bg-white/90 px-2.5 py-2 text-[11px] text-slate-700"
+                      className="min-w-[124px] rounded-xl border border-[rgba(17,33,61,0.08)] bg-white/90 px-2.5 py-2 text-[11px] text-slate-700"
                     >
-                      <p className="truncate font-semibold text-slate-900">{participant.name}</p>
+                      <p className="truncate text-[clamp(0.75rem,1.9vw,0.86rem)] font-semibold text-slate-900">{participant.name}</p>
                       <p className="mt-1 uppercase tracking-[0.16em] text-slate-400">{participant.status}</p>
                     </div>
                   ))}
@@ -215,7 +215,7 @@ export default function InstructionsPage() {
                   <input type="checkbox" checked={ack} onChange={(event) => setAck(event.target.checked)} />
                   I allow fullscreen monitoring for this attempt
                 </label>
-                <div className="mt-3 flex gap-2">
+                <div className="mt-3 flex flex-wrap gap-2">
                   <button className="btn-outline" onClick={enableFullscreen}>Enable Fullscreen</button>
                   <button className="btn-primary flex-1" onClick={startExam} disabled={loading}>
                     {loading ? 'Starting...' : 'Enter Exam'}
@@ -230,7 +230,7 @@ export default function InstructionsPage() {
           <div className="compact-stack min-w-0 order-2 lg:order-1">
             <div className="card-strong">
               <div className="badge-blue">{isLive ? 'Live Launch Ready' : 'Waiting Room'}</div>
-              <h1 className="hero-title mt-3 text-2xl md:text-4xl">
+              <h1 className="hero-title mt-3">
                 {isLive ? 'The exam is live. Enter fullscreen to begin.' : 'You are in the waiting room.'}
               </h1>
               <p className="hero-subtitle mt-3">
@@ -256,21 +256,21 @@ export default function InstructionsPage() {
                 <div className="mt-3 grid grid-cols-2 gap-2">
                   <div className="stat-card">
                     <p className="section-kicker">Session</p>
-                    <p className="mt-2 text-sm font-semibold text-slate-900">{sessionMeta?.name || 'Awaiting session context'}</p>
+                    <p className="mt-2 value-fit font-semibold text-slate-900">{sessionMeta?.name || 'Awaiting session context'}</p>
                     <p className="mt-1 text-xs text-slate-500">ID: {sessionMeta?.sessionId || '-'}</p>
                   </div>
                   <div className="stat-card">
                     <p className="section-kicker">Launch Status</p>
-                    <p className="mt-2 text-sm font-semibold text-slate-900">{runtime?.session?.status || sessionMeta?.status || 'waiting_room'}</p>
+                    <p className="mt-2 value-fit font-semibold text-slate-900">{runtime?.session?.status || sessionMeta?.status || 'waiting_room'}</p>
                     <p className="mt-1 text-xs text-slate-500">Opened: {formatTime(runtime?.session?.roomOpenedAt || sessionMeta?.roomOpenedAt)}</p>
                   </div>
                   <div className="stat-card">
                     <p className="section-kicker">Total Timer</p>
-                    <p className="mt-2 text-sm font-semibold text-slate-900">{sessionSettings.enableTotalTimer ? formatSeconds(sessionSettings.totalTime) : 'Disabled'}</p>
+                    <p className="mt-2 value-fit font-semibold text-slate-900">{sessionSettings.enableTotalTimer ? formatSeconds(sessionSettings.totalTime) : 'Disabled'}</p>
                   </div>
                   <div className="stat-card">
                     <p className="section-kicker">Question Timer</p>
-                    <p className="mt-2 text-sm font-semibold text-slate-900">{sessionSettings.enableQuestionTimer ? formatSeconds(sessionSettings.defaultQuestionTime) : 'Disabled'}</p>
+                    <p className="mt-2 value-fit font-semibold text-slate-900">{sessionSettings.enableQuestionTimer ? formatSeconds(sessionSettings.defaultQuestionTime) : 'Disabled'}</p>
                   </div>
                 </div>
               )}

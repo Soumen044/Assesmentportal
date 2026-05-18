@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
+import { clearAdminSession } from '../lib/adminSession';
 
 const links = [
   { href: '/admin/dashboard', label: 'Dashboard' },
@@ -20,7 +21,7 @@ export default function AdminNav() {
   }).format(new Date());
 
   const handleLogout = () => {
-    localStorage.removeItem('adminToken');
+    clearAdminSession({ forceRedirect: false });
     router.push('/admin/login');
   };
 

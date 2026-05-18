@@ -1,7 +1,9 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import AdminNav from '../../../components/AdminNav';
+import AdminPageGuard from '../../../components/AdminPageGuard';
 import Stepper from '../../../components/Stepper';
 import QuestionBuilder from '../../../components/QuestionBuilder';
 import BulkQuestionTable from '../../../components/BulkQuestionTable';
@@ -54,6 +56,7 @@ function computeRuntimeSummary(questions, settings) {
 }
 
 export default function CreateAssessmentPage() {
+  const router = useRouter();
   const [step, setStep] = useState(0);
   const [session, setSession] = useState({ name: '', sessionId: '', password: '', status: 'draft' });
   const [questions, setQuestions] = useState([]);
@@ -273,9 +276,10 @@ export default function CreateAssessmentPage() {
     setMessage('');
     try {
       const response = await api.post(`/api/assessments/${session.sessionId}/open-room`);
-      setSession((prev) => ({ ...prev, ...(response.data.assessment || {}), status: 'waiting_room' }));
+      const nextSession = { ...session, ...(response.data.assessment || {}), status: 'waiting_room' };
+      setSession(nextSession);
       setStep(4);
-      setMessage(`Waiting room opened. Students can now join with session password ${session.password}.`);
+      router.push(`/admin/live?sessionId=${encodeURIComponent(nextSession.sessionId || session.sessionId)}`);
     } catch (err) {
       setMessage(err.response?.data?.error || 'Unable to open the waiting room');
     } finally {
@@ -306,15 +310,16 @@ export default function CreateAssessmentPage() {
   };
 
   return (
-    <main className="page-shell surface-grid">
-      <div className="page-wrap">
-        <AdminNav />
-        <Stepper steps={steps} current={step} />
+    <AdminPageGuard>
+      <main className="page-shell surface-grid">
+        <div className="page-wrap">
+          <AdminNav />
+          <Stepper steps={steps} current={step} />
 
-        {message && <div className="glass-banner mb-4 fade-rise text-sm text-slate-700">{message}</div>}
+          {message && <div className="glass-banner mb-4 fade-rise text-xs text-slate-700">{message}</div>}
 
-        <div className="grid gap-3 lg:grid-cols-[0.72fr_1.28fr]">
-          <aside className="compact-stack min-w-0">
+          <div className="grid gap-2.5 lg:grid-cols-[0.72fr_1.28fr]">
+            <aside className="compact-stack min-w-0">
             <div className="card-strong fade-rise">
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div className="badge-blue">Session Frame</div>
@@ -370,14 +375,14 @@ export default function CreateAssessmentPage() {
                 </div>
               </div>
             </div>
-          </aside>
+            </aside>
 
-          <section className="compact-stack min-w-0">
+            <section className="compact-stack min-w-0">
             {step === 0 && (
               <div className="card-strong fade-rise">
                 <div className="space-y-3">
                   <div className="badge-orange">Step 1</div>
-                  <h1 className="hero-title text-2xl">Start with the session shell.</h1>
+                  <h1 className="hero-title text-[clamp(1.2rem,2vw,1.7rem)]">Start with the session shell.</h1>
                   <p className="hero-subtitle">
                     Create the session first. Only after the password is generated will question upload, question design, and timing controls unlock.
                   </p>
@@ -414,12 +419,12 @@ export default function CreateAssessmentPage() {
                   {canvasTab === 'manual' && (
                     <div className="mt-3 grid gap-3 xl:grid-cols-[0.9fr_1.1fr]">
                       <div className="compact-stack">
-                        <div className="table-shell p-3">
+                        <div className="table-shell p-2.5">
                           <label className="label">Upload Question Sheet</label>
                           <input className="input" type="file" accept=".xlsx,.xls" onChange={handleUpload} disabled={!sessionReady || loading} />
                           <p className="mt-2 text-compact text-slate-500">Template includes question, options, answer, and image only. Timing is set later in the timing step.</p>
                         </div>
-                        <div className="table-shell p-3">
+                        <div className="table-shell p-2.5">
                           <p className="section-kicker">Manual Builder</p>
                           <div className="mt-3">
                             <QuestionBuilder
@@ -438,7 +443,7 @@ export default function CreateAssessmentPage() {
                           </div>
                         </div>
                       </div>
-                      <div className="table-shell p-3">
+                      <div className="table-shell p-2.5">
                         <div className="flex flex-wrap items-center justify-between gap-3">
                           <p className="section-kicker">Builder Notes</p>
                           <span className="badge-blue">{questions.length} ready</span>
@@ -459,7 +464,7 @@ export default function CreateAssessmentPage() {
 
                   {canvasTab === 'preview' && (
                     <div className="mt-3 compact-stack">
-                      {!questions.length && <div className="table-shell p-3 text-sm text-slate-500">No questions yet. Create or upload at least one question to continue.</div>}
+                      {!questions.length && <div className="table-shell p-2.5 text-xs text-slate-500">No questions yet. Create or upload at least one question to continue.</div>}
                       {questions.map((question, index) => (
                         <div
                           key={question.id}
@@ -515,7 +520,7 @@ export default function CreateAssessmentPage() {
                           }}
                         />
                       ) : (
-                        <div className="table-shell p-3 text-sm text-slate-500">Bulk edit unlocks after at least one question exists.</div>
+                        <div className="table-shell p-2.5 text-xs text-slate-500">Bulk edit unlocks after at least one question exists.</div>
                       )}
                     </div>
                   )}
@@ -527,8 +532,8 @@ export default function CreateAssessmentPage() {
             )}
 
             {step === 2 && (
-              <div className="card-strong fade-rise">
-                <div className="badge-orange">Step 3</div>
+                <div className="card-strong fade-rise">
+                  <div className="badge-orange">Step 3</div>
                 <h2 className="section-title mt-2">Timing and behavior settings</h2>
                 <p className="mt-2 text-sm text-slate-600">All timing is controlled here. Set one default value, then override only the questions that need different timing.</p>
 
@@ -605,7 +610,7 @@ export default function CreateAssessmentPage() {
                 </div>
 
                 <div className="mt-3 table-shell compact-scroll">
-                  <table className="min-w-full text-[11px]">
+                  <table className="min-w-[720px] text-[11px]">
                     <thead>
                       <tr className="border-b border-[rgba(17,33,61,0.08)] text-left text-slate-500">
                         <th className="px-2 py-2 font-medium">Q</th>
@@ -712,7 +717,7 @@ export default function CreateAssessmentPage() {
                     </div>
                   )}
 
-                  <div className="mt-4 flex gap-3">
+                  <div className="mt-4 flex flex-wrap gap-2">
                     <button className="btn-outline" onClick={() => setStep(2)}>Back to Settings</button>
                     <button className="btn-accent" onClick={handleOpenWaitingRoom} disabled={loading || !questions.length || session.status === 'waiting_room' || session.status === 'live'}>
                       {loading ? 'Opening...' : 'Open Waiting Room'}
@@ -731,9 +736,10 @@ export default function CreateAssessmentPage() {
                 </div>
               </div>
             )}
-          </section>
+            </section>
+          </div>
         </div>
-      </div>
-    </main>
+      </main>
+    </AdminPageGuard>
   );
 }

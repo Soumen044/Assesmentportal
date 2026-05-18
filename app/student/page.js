@@ -108,7 +108,7 @@ export default function StudentPage() {
   return (
     <main className="page-shell surface-grid">
       <div className="page-wrap">
-        <section className="grid gap-3 lg:grid-cols-[0.98fr_1.02fr] fade-rise">
+        <section className="grid gap-2.5 lg:grid-cols-[0.98fr_1.02fr] fade-rise">
           <div className="card order-1 lg:order-2">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <div>
@@ -129,7 +129,7 @@ export default function StudentPage() {
                   <label className="label">Name</label>
                   <input className="input" value={form.name} onChange={handleChange('name')} placeholder="Letters only" />
                 </div>
-                <div className="grid gap-3 sm:grid-cols-2">
+                <div className="grid gap-2 sm:grid-cols-2">
                   <div>
                     <label className="label">Phone Number</label>
                     <input className="input" value={form.phone} onChange={handleChange('phone')} inputMode="numeric" maxLength={10} placeholder="10 digits" />
@@ -163,7 +163,7 @@ export default function StudentPage() {
                   </div>
                 </div>
                 {message && <p className="text-xs text-red-600">{message}</p>}
-                <div className="flex gap-2">
+                <div className="flex flex-wrap gap-2">
                   <button className="btn-outline" onClick={() => setStep(1)}>Back</button>
                   <button className="btn-accent flex-1" onClick={handleVerifyAndJoin} disabled={loading || !normalizedPassword}>
                     {loading ? 'Verifying...' : 'Join Waiting Room'}
@@ -176,7 +176,7 @@ export default function StudentPage() {
           <div className="compact-stack min-w-0 order-2 lg:order-1">
             <div className="card-strong">
               <div className="badge-orange">Student Entry</div>
-              <h1 className="hero-title mt-3 text-2xl md:text-4xl">Join with a short, phone-friendly flow.</h1>
+              <h1 className="hero-title mt-3">Join with a short, phone-friendly flow.</h1>
               <p className="hero-subtitle mt-2">
                 Verify profile and session, then confirm the password and move straight to the waiting room.
               </p>
@@ -225,11 +225,11 @@ export default function StudentPage() {
                 <div className="mt-3 grid gap-2 grid-cols-2 md:grid-cols-3">
                   <div className="stat-card">
                     <p className="section-kicker">Session</p>
-                    <p className="mt-2 text-sm font-semibold">{sessionMeta.name}</p>
+                    <p className="mt-2 value-fit font-semibold">{sessionMeta.name}</p>
                   </div>
                   <div className="stat-card">
                     <p className="section-kicker">Status</p>
-                    <p className="mt-2 text-sm font-semibold">{sessionMeta.status}</p>
+                    <p className="mt-2 value-fit font-semibold">{sessionMeta.status}</p>
                   </div>
                   <div className="stat-card">
                     <p className="section-kicker">Opened</p>

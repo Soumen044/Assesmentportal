@@ -1,7 +1,9 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import AdminNav from '../../../components/AdminNav';
+import AdminPageGuard from '../../../components/AdminPageGuard';
 import LiveStudentList from '../../../components/LiveStudentList';
 import api from '../../../lib/api';
 
@@ -27,6 +29,8 @@ function formatDateTime(value) {
 }
 
 export default function LivePage() {
+  const router = useRouter();
+  const [preferredSessionId, setPreferredSessionId] = useState('');
   const [sessionId, setSessionId] = useState('');
   const [sessions, setSessions] = useState([]);
   const [waitingRoster, setWaitingRoster] = useState([]);
@@ -34,9 +38,18 @@ export default function LivePage() {
   const [leaderboard, setLeaderboard] = useState([]);
   const [sessionMeta, setSessionMeta] = useState(null);
   const [message, setMessage] = useState('');
+  const [launching, setLaunching] = useState(false);
   const [stopping, setStopping] = useState(false);
   const [exportingPdf, setExportingPdf] = useState(false);
   const [tab, setTab] = useState('rosters');
+
+  useEffect(() => {
+    if (typeof window === 'undefined') {
+      return;
+    }
+    const params = new URLSearchParams(window.location.search);
+    setPreferredSessionId(params.get('sessionId') || '');
+  }, []);
 
   useEffect(() => {
     const loadSessions = async () => {
@@ -44,6 +57,10 @@ export default function LivePage() {
         const response = await api.get('/api/assessments');
         const activeSessions = (response.data.assessments || []).filter((assessment) => ['waiting_room', 'live'].includes(assessment.status));
         setSessions(activeSessions);
+        if (preferredSessionId && activeSessions.some((assessment) => assessment.sessionId === preferredSessionId)) {
+          setSessionId(preferredSessionId);
+          return;
+        }
         if (!sessionId && activeSessions[0]?.sessionId) {
           setSessionId(activeSessions[0].sessionId);
         }
@@ -55,7 +72,7 @@ export default function LivePage() {
     loadSessions();
     const intervalId = window.setInterval(loadSessions, 6000);
     return () => window.clearInterval(intervalId);
-  }, [sessionId]);
+  }, [preferredSessionId, sessionId]);
 
   useEffect(() => {
     if (!sessionId) {
@@ -124,6 +141,29 @@ export default function LivePage() {
     }
   };
 
+  const handleLaunchSession = async () => {
+    if (!selectedSession || selectedSession.status === 'live') {
+      return;
+    }
+    setLaunching(true);
+    setMessage('');
+    try {
+      const response = await api.post(`/api/assessments/${selectedSession.sessionId}/launch`);
+      const nextAssessment = response.data.assessment || {};
+      setSessionMeta((current) => ({ ...(current || {}), ...nextAssessment, status: 'live' }));
+      setSessions((current) => current.map((assessment) => (
+        assessment.sessionId === selectedSession.sessionId
+          ? { ...assessment, ...nextAssessment, status: 'live' }
+          : assessment
+      )));
+      setMessage('Session launched. Waiting candidates can now enter the live exam.');
+    } catch (err) {
+      setMessage(err.response?.data?.error || 'Unable to launch the live exam');
+    } finally {
+      setLaunching(false);
+    }
+  };
+
   const handleExportPdf = async () => {
     if (!selectedSession) {
       return;
@@ -150,11 +190,12 @@ export default function LivePage() {
   };
 
   return (
-    <main className="page-shell surface-grid">
-      <div className="page-wrap">
-        <AdminNav />
-        {message && <div className="glass-banner mb-4 text-sm text-slate-700">{message}</div>}
-        <section className="grid gap-4 xl:grid-cols-[0.86fr_1.14fr] fade-rise">
+    <AdminPageGuard>
+      <main className="page-shell surface-grid">
+        <div className="page-wrap">
+          <AdminNav />
+          {message && <div className="glass-banner mb-4 text-xs text-slate-700">{message}</div>}
+          <section className="grid gap-3 xl:grid-cols-[0.84fr_1.16fr] fade-rise">
           <div className="compact-stack min-w-0">
             <div className="card-strong">
               <div className="badge-orange">Live Assessments</div>
@@ -167,12 +208,15 @@ export default function LivePage() {
               <input className="input" value={sessionId} onChange={(event) => setSessionId(event.target.value)} placeholder="Enter or pick an active session ID" />
             </div>
 
-            <div className="grid gap-2">
+              <div className="grid gap-2">
               {sessions.map((session) => (
                 <button
                   key={session.sessionId}
                   className={`card w-full text-left transition ${session.sessionId === sessionId ? 'ring-2 ring-[rgba(29,114,255,0.22)]' : 'hover:-translate-y-1'}`}
-                  onClick={() => setSessionId(session.sessionId)}
+                  onClick={() => {
+                    setSessionId(session.sessionId);
+                    router.replace(`/admin/live?sessionId=${encodeURIComponent(session.sessionId)}`, { scroll: false });
+                  }}
                 >
                   <div className="flex flex-wrap items-center justify-between gap-3">
                     <div className="min-w-0">
@@ -246,6 +290,11 @@ export default function LivePage() {
                     </div>
                   </div>
                   <div className="mt-4 flex flex-wrap gap-2">
+                    {(sessionMeta?.status || selectedSession.status) === 'waiting_room' && (
+                      <button className="btn-primary" onClick={handleLaunchSession} disabled={launching}>
+                        {launching ? 'Launching...' : 'Make Assessment Live'}
+                      </button>
+                    )}
                     <button className="btn-outline" onClick={handleExportPdf} disabled={exportingPdf}>
                       {exportingPdf ? 'Exporting PDF...' : 'Export PDF'}
                     </button>
@@ -253,6 +302,11 @@ export default function LivePage() {
                       {stopping ? 'Stopping...' : 'Stop Session'}
                     </button>
                   </div>
+                  {(sessionMeta?.status || selectedSession.status) === 'waiting_room' && (
+                    <div className="mt-3 rounded-[16px] border border-[rgba(255,138,42,0.16)] bg-[rgba(255,138,42,0.08)] px-3 py-2 text-xs text-slate-700">
+                      Review waiting-room participants below, then make the assessment live from this panel.
+                    </div>
+                  )}
                 </>
               )}
             </div>
@@ -318,7 +372,7 @@ export default function LivePage() {
 
               {tab === 'leaderboard' && (
                 <div className="mt-4 table-shell compact-scroll">
-                  <table className="min-w-full text-xs">
+                  <table className="min-w-[960px] text-[11px]">
                     <thead>
                       <tr className="border-b border-[rgba(17,33,61,0.08)] text-left text-slate-500">
                         <th className="px-3 py-2 font-medium">Rank</th>
@@ -360,8 +414,9 @@ export default function LivePage() {
               )}
             </div>
           </div>
-        </section>
-      </div>
-    </main>
+          </section>
+        </div>
+      </main>
+    </AdminPageGuard>
   );
 }

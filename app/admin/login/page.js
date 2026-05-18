@@ -1,8 +1,9 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import api from '../../../lib/api';
+import { clearAdminSession, hasValidAdminToken } from '../../../lib/adminSession';
 
 export default function AdminLoginPage() {
   const router = useRouter();
@@ -11,6 +12,14 @@ export default function AdminLoginPage() {
   const [otp, setOtp] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (hasValidAdminToken()) {
+      router.replace('/admin/dashboard');
+      return;
+    }
+    clearAdminSession({ forceRedirect: false });
+  }, [router]);
 
   const handleChange = (field) => (event) => {
     const value = field === 'captchaVerified' ? event.target.checked : event.target.value;

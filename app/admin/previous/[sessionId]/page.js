@@ -13,6 +13,7 @@ import {
   Legend
 } from 'chart.js';
 import AdminNav from '../../../../components/AdminNav';
+import AdminPageGuard from '../../../../components/AdminPageGuard';
 import MathText from '../../../../components/MathText';
 import api from '../../../../lib/api';
 
@@ -168,79 +169,80 @@ export default function PreviousAssessmentDetailPage() {
   };
 
   return (
-    <main className="page-shell surface-grid">
-      <div className="page-wrap">
-        <AdminNav />
-        {message && <div className="glass-banner mb-3 text-xs text-slate-700">{message}</div>}
+    <AdminPageGuard>
+      <main className="page-shell surface-grid">
+        <div className="page-wrap">
+          <AdminNav />
+          {message && <div className="glass-banner mb-3 text-xs text-slate-700">{message}</div>}
 
-        <section className="compact-stack fade-rise">
-          <div className="card-strong">
-            <div className="flex flex-wrap items-start justify-between gap-3">
-              <div className="min-w-0">
-                <div className="badge-blue">Assessment Detail</div>
-                <h1 className="section-title mt-2">{assessment?.name || 'Loading assessment...'}</h1>
-                {assessment && <p className="mt-1 text-compact text-slate-600">{assessment.sessionId}</p>}
-              </div>
-              <div className="flex flex-wrap gap-2">
-                <button className="btn-outline" onClick={() => router.push('/admin/previous')}>Back</button>
-                <button className="btn-primary" onClick={handleExport} disabled={downloadingId === sessionId || loading}>
-                  {downloadingId === sessionId ? 'Exporting...' : 'Export CSV'}
-                </button>
-                <button className="btn-outline" onClick={handleExportPdf} disabled={downloadingPdfId === sessionId || loading}>
-                  {downloadingPdfId === sessionId ? 'Exporting...' : 'Export PDF'}
-                </button>
-                <button className="btn-accent" onClick={handleDelete} disabled={deleting || loading}>
-                  {deleting ? 'Deleting...' : 'Delete'}
-                </button>
-              </div>
-            </div>
-          </div>
-
-          <div className="card">
-            <div className="panel-tabs">
-              {[
-                ['summary', 'Summary'],
-                ['questions', `Questions (${questions.length})`],
-                ['results', `Results (${students.length})`]
-              ].map(([key, label]) => (
-                <button
-                  key={key}
-                  className={`tab-chip ${tab === key ? 'tab-chip-active' : ''}`}
-                  onClick={() => setTab(key)}
-                >
-                  {label}
-                </button>
-              ))}
-            </div>
-
-            {loading && <div className="mt-3 table-shell p-3 text-xs text-slate-500">Loading assessment view...</div>}
-
-            {!loading && assessment && (
-              <>
-                <div className="mt-3 grid grid-cols-2 gap-2 md:grid-cols-5">
-                  <button className="stat-card text-left" onClick={() => setTab('summary')}>
-                    <p className="section-kicker">Date</p>
-                    <p className="mt-1 text-compact font-semibold text-slate-900">{formatDateTime(assessment.createdAt)}</p>
+          <section className="compact-stack fade-rise">
+            <div className="card-strong">
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <div className="badge-blue">Assessment Detail</div>
+                  <h1 className="section-title mt-2">{assessment?.name || 'Loading assessment...'}</h1>
+                  {assessment && <p className="mt-1 text-compact text-slate-600">{assessment.sessionId}</p>}
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <button className="btn-outline" onClick={() => router.push('/admin/previous')}>Back</button>
+                  <button className="btn-primary" onClick={handleExport} disabled={downloadingId === sessionId || loading}>
+                    {downloadingId === sessionId ? 'Exporting...' : 'Export CSV'}
                   </button>
-                  <button className="stat-card text-left" onClick={() => setTab('questions')}>
-                    <p className="section-kicker">Questions</p>
-                    <p className="mt-1 text-base font-semibold text-slate-900">{questions.length}</p>
+                  <button className="btn-outline" onClick={handleExportPdf} disabled={downloadingPdfId === sessionId || loading}>
+                    {downloadingPdfId === sessionId ? 'Exporting...' : 'Export PDF'}
                   </button>
-                  <button className="stat-card text-left" onClick={() => setTab('results')}>
-                    <p className="section-kicker">Results</p>
-                    <p className="mt-1 text-base font-semibold text-slate-900">{students.length}</p>
-                  </button>
-                  <button className="stat-card text-left" onClick={() => setTab('results')}>
-                    <p className="section-kicker">Top Score</p>
-                    <p className="mt-1 text-base font-semibold text-slate-900">{topScore}</p>
-                  </button>
-                  <button className="stat-card text-left" onClick={() => setTab('summary')}>
-                    <p className="section-kicker">Violations</p>
-                    <p className="mt-1 text-base font-semibold text-slate-900">{totalViolations}</p>
+                  <button className="btn-accent" onClick={handleDelete} disabled={deleting || loading}>
+                    {deleting ? 'Deleting...' : 'Delete'}
                   </button>
                 </div>
+              </div>
+            </div>
 
-                {tab === 'summary' && (
+            <div className="card">
+              <div className="panel-tabs">
+                {[
+                  ['summary', 'Summary'],
+                  ['questions', `Questions (${questions.length})`],
+                  ['results', `Results (${students.length})`]
+                ].map(([key, label]) => (
+                  <button
+                    key={key}
+                    className={`tab-chip ${tab === key ? 'tab-chip-active' : ''}`}
+                    onClick={() => setTab(key)}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+
+              {loading && <div className="mt-3 table-shell p-3 text-xs text-slate-500">Loading assessment view...</div>}
+
+              {!loading && assessment && (
+                <>
+                  <div className="mt-3 grid grid-cols-2 gap-2 md:grid-cols-5">
+                    <button className="stat-card text-left" onClick={() => setTab('summary')}>
+                      <p className="section-kicker">Date</p>
+                      <p className="mt-1 text-compact font-semibold text-slate-900">{formatDateTime(assessment.createdAt)}</p>
+                    </button>
+                    <button className="stat-card text-left" onClick={() => setTab('questions')}>
+                      <p className="section-kicker">Questions</p>
+                      <p className="mt-1 text-base font-semibold text-slate-900">{questions.length}</p>
+                    </button>
+                    <button className="stat-card text-left" onClick={() => setTab('results')}>
+                      <p className="section-kicker">Results</p>
+                      <p className="mt-1 text-base font-semibold text-slate-900">{students.length}</p>
+                    </button>
+                    <button className="stat-card text-left" onClick={() => setTab('results')}>
+                      <p className="section-kicker">Top Score</p>
+                      <p className="mt-1 text-base font-semibold text-slate-900">{topScore}</p>
+                    </button>
+                    <button className="stat-card text-left" onClick={() => setTab('summary')}>
+                      <p className="section-kicker">Violations</p>
+                      <p className="mt-1 text-base font-semibold text-slate-900">{totalViolations}</p>
+                    </button>
+                  </div>
+
+                  {tab === 'summary' && (
                   <div className="mt-3 grid gap-3 lg:grid-cols-[1fr_1fr]">
                     <div className="table-shell p-3">
                       <div className="flex items-center justify-between gap-2">
@@ -284,7 +286,7 @@ export default function PreviousAssessmentDetailPage() {
                   </div>
                 )}
 
-                {tab === 'questions' && (
+                  {tab === 'questions' && (
                   <div className="mt-3">
                     <div className="flex gap-2 overflow-x-auto pb-1">
                       {questions.map((question, index) => (
@@ -318,7 +320,7 @@ export default function PreviousAssessmentDetailPage() {
                   </div>
                 )}
 
-                {tab === 'results' && (
+                  {tab === 'results' && (
                   <div className="mt-3">
                     <div className="flex gap-2 overflow-x-auto pb-1">
                       {students.map((student) => (
@@ -361,11 +363,12 @@ export default function PreviousAssessmentDetailPage() {
                     </div>
                   </div>
                 )}
-              </>
-            )}
-          </div>
-        </section>
-      </div>
-    </main>
+                </>
+              )}
+            </div>
+          </section>
+        </div>
+      </main>
+    </AdminPageGuard>
   );
 }

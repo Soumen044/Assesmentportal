@@ -8,6 +8,16 @@ import MathText from '../../../components/MathText';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || '';
 const SKIPPED_TOKEN = '__SKIPPED__';
+const FULLSCREEN_RECOVERY_SECONDS = 8;
+const VIOLATION_RULES = {
+  'tab-switch': { cooldownMs: 4000, bucket: 'focus-loss' },
+  'browser-blur': { cooldownMs: 4000, bucket: 'focus-loss' },
+  'fullscreen-exit-attempt': { cooldownMs: 5000, bucket: 'fullscreen-exit' },
+  'right-click-attempt': { cooldownMs: 1200, bucket: 'pointer-attempt' },
+  'double-click-attempt': { cooldownMs: 1200, bucket: 'pointer-attempt' },
+  'double-tap-attempt': { cooldownMs: 1200, bucket: 'pointer-attempt' },
+  'back-navigation-attempt': { cooldownMs: 2500, bucket: 'navigation-attempt' }
+};
 
 function formatClock(totalSeconds) {
   const seconds = Math.max(0, Number(totalSeconds || 0));
@@ -103,9 +113,15 @@ function reducer(state, action) {
     case 'SET_VIOLATIONS':
       return { ...state, violationCount: action.count };
     case 'SET_MODAL':
-      return { ...state, fullscreenModalOpen: action.open, fullscreenCountdown: action.open ? 8 : state.fullscreenCountdown };
+      return {
+        ...state,
+        fullscreenModalOpen: action.open,
+        fullscreenCountdown: action.open ? FULLSCREEN_RECOVERY_SECONDS : state.fullscreenCountdown
+      };
     case 'SET_FULLSCREEN_COUNTDOWN':
       return { ...state, fullscreenCountdown: action.value };
+    case 'TICK_FULLSCREEN_COUNTDOWN':
+      return { ...state, fullscreenCountdown: Math.max(0, state.fullscreenCountdown - 1) };
     case 'TICK': {
       const nextQuestionRemaining = { ...state.questionRemaining };
       const currentQuestion = state.questions[state.currentIndex];
@@ -152,7 +168,7 @@ const initialState = {
   violationCount: 0,
   violationThreshold: 3,
   fullscreenModalOpen: false,
-  fullscreenCountdown: 8,
+  fullscreenCountdown: FULLSCREEN_RECOVERY_SECONDS,
   message: ''
 };
 
@@ -165,6 +181,7 @@ export default function ExamPage() {
   const submittingRef = useRef(false);
   const fullscreenViolationLoggedRef = useRef(false);
   const touchTrackerRef = useRef({ lastTapAt: 0 });
+  const violationTrackerRef = useRef({});
   const queueRef = useRef([]);
   const flushingRef = useRef(false);
 
@@ -230,20 +247,37 @@ export default function ExamPage() {
     flushQueue();
   }, [flushQueue]);
 
+  const buildAnswerRequest = useCallback((questionId, answerRecord, currentQuestionIndex) => ({
+    sessionId: state.sessionId,
+    studentId: state.studentId,
+    questionId,
+    selectedOption: answerRecord.selectedOption || '',
+    skipped: Boolean(answerRecord.skipped),
+    timedOut: Boolean(answerRecord.timedOut),
+    currentQuestion: currentQuestionIndex
+  }), [state.sessionId, state.studentId]);
+
   const submitRuntimeAnswer = useCallback(async (questionId, answerRecord, currentQuestionIndex) => {
-    await api.post('/api/students/answer', {
-      sessionId: state.sessionId,
-      studentId: state.studentId,
-      questionId,
-      selectedOption: answerRecord.selectedOption || '',
-      skipped: Boolean(answerRecord.skipped),
-      timedOut: Boolean(answerRecord.timedOut),
-      currentQuestion: currentQuestionIndex
-    });
-  }, [state.sessionId, state.studentId]);
+    await api.post('/api/students/answer', buildAnswerRequest(questionId, answerRecord, currentQuestionIndex));
+  }, [buildAnswerRequest]);
+
+  const shouldReportViolation = useCallback((type) => {
+    const rule = VIOLATION_RULES[type] || { cooldownMs: 2000, bucket: type };
+    const bucket = rule.bucket || type;
+    const now = Date.now();
+    const lastLoggedAt = Number(violationTrackerRef.current[bucket] || 0);
+    if ((now - lastLoggedAt) < rule.cooldownMs) {
+      return false;
+    }
+    violationTrackerRef.current[bucket] = now;
+    return true;
+  }, []);
 
   const reportViolation = useCallback(async (type, warning) => {
-    if (!state.sessionId || !state.studentId) {
+    if (!state.sessionId || !state.studentId || safeExitRef.current || submittingRef.current) {
+      return;
+    }
+    if (!shouldReportViolation(type)) {
       return;
     }
     if (warning) {
@@ -267,7 +301,7 @@ export default function ExamPage() {
         navigateToResult();
       }
     });
-  }, [enqueue, navigateToResult, pushWarning, state.sessionId, state.studentId, state.violationCount, state.violationThreshold]);
+  }, [enqueue, navigateToResult, pushWarning, shouldReportViolation, state.sessionId, state.studentId, state.violationCount, state.violationThreshold]);
 
   const handleAutoSubmit = useCallback(async (reason) => {
     if (submittingRef.current) {
@@ -494,12 +528,12 @@ export default function ExamPage() {
       if (fullscreenModalTimerRef.current) {
         window.clearInterval(fullscreenModalTimerRef.current);
       }
-      dispatch({ type: 'SET_FULLSCREEN_COUNTDOWN', value: 8 });
+      dispatch({ type: 'SET_FULLSCREEN_COUNTDOWN', value: FULLSCREEN_RECOVERY_SECONDS });
       return undefined;
     }
 
     fullscreenModalTimerRef.current = window.setInterval(() => {
-      dispatch({ type: 'SET_FULLSCREEN_COUNTDOWN', value: Math.max(0, state.fullscreenCountdown - 1) });
+      dispatch({ type: 'TICK_FULLSCREEN_COUNTDOWN' });
     }, 1000);
 
     return () => {
@@ -507,7 +541,7 @@ export default function ExamPage() {
         window.clearInterval(fullscreenModalTimerRef.current);
       }
     };
-  }, [state.fullscreenCountdown, state.fullscreenModalOpen]);
+  }, [state.fullscreenModalOpen]);
 
   useEffect(() => {
     if (state.fullscreenModalOpen && state.fullscreenCountdown <= 0) {
@@ -610,7 +644,7 @@ export default function ExamPage() {
   return (
     <main className="page-shell surface-grid">
       <div className="page-wrap max-w-4xl">
-        <section className="space-y-3 fade-rise">
+        <section className="space-y-2.5 fade-rise">
           {state.fullscreenModalOpen && (
             <div className="fixed inset-0 z-50 flex items-center justify-center bg-[rgba(17,33,61,0.7)] px-4">
               <div className="card-strong max-w-xl">
@@ -653,17 +687,17 @@ export default function ExamPage() {
                 {state.settings.enableQuestionTimer ? `${formatClock(currentQuestionTime)} for this question` : 'Per-question timer disabled'}
               </span>
             </div>
-            <div className="mt-2 text-base font-semibold leading-5 text-slate-900 sm:text-lg">
+            <div className="mt-2 text-[clamp(0.98rem,2vw,1.14rem)] font-semibold leading-5 text-slate-900">
               <MathText text={currentQuestion.question} />
             </div>
             {currentQuestion.image && (
               <img src={currentQuestion.image} alt="Question" className="mt-3 max-h-52 rounded-[16px] border border-[rgba(17,33,61,0.08)] object-contain p-2" />
             )}
-            <div className="mt-3 grid grid-cols-2 gap-2">
+            <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
               {Object.entries(currentQuestion.options).map(([key, value]) => (
                 <button
                   key={key}
-                  className={`min-h-[78px] rounded-[14px] border px-3 py-2 text-left text-xs leading-4 transition ${
+                  className={`min-h-[72px] rounded-[14px] border px-3 py-2 text-left text-[clamp(0.76rem,1.8vw,0.85rem)] leading-4 transition ${
                     currentAnswer.selectedOption === key
                       ? 'border-[rgba(29,114,255,0.28)] bg-[rgba(29,114,255,0.12)] text-blue-900'
                       : 'border-[rgba(17,33,61,0.08)] bg-white/80 text-slate-700 hover:border-[rgba(255,138,42,0.24)] hover:bg-[rgba(255,138,42,0.08)]'
@@ -671,7 +705,7 @@ export default function ExamPage() {
                   onClick={() => handleSelect(key)}
                 >
                   <strong className="mr-2">{key}.</strong>
-                  <MathText text={value} />
+                  <span className="content-safe"><MathText text={value} /></span>
                 </button>
               ))}
             </div>
